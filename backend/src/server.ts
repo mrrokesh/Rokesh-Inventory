@@ -32,7 +32,16 @@ import { startWebhookWorker } from './lib/webhooks.js';
 const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
-app.use(cors({ origin: config.corsOrigin, credentials: false }));
+app.use(cors({
+  origin(origin, cb) {
+    if (!origin) return cb(null, true);
+    if (config.corsOrigin.includes('*') || config.corsOrigin.includes(origin) || /\.vercel\.app$/i.test(origin)) {
+      return cb(null, true);
+    }
+    cb(new Error('Not allowed by CORS'));
+  },
+  credentials: false,
+}));
 // Payment gateway webhooks need the raw body to verify signatures, so they come before the JSON parser.
 app.post('/api/hooks/razorpay/:slug', express.raw({ type: '*/*', limit: '1mb' }), async (req, res) => {
   try {

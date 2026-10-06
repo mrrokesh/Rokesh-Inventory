@@ -1,5 +1,15 @@
 const TOKEN_KEY = 'inv_token';
 
+/** Empty in local Vite (dev proxy). On Vercel, set VITE_API_URL to the Render API origin. */
+export const API_BASE = String(import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+
+export function mediaUrl(path?: string | null): string {
+  if (!path) return '';
+  if (/^https?:\/\//i.test(path)) return path;
+  const p = path.startsWith('/') ? path : `/${path}`;
+  return `${API_BASE}${p}`;
+}
+
 export function getToken(): string {
   try { return localStorage.getItem(TOKEN_KEY) || ''; } catch { return ''; }
 }
@@ -33,7 +43,7 @@ async function request<T = any>(method: string, path: string, body?: unknown, { 
   }
   let res: Response;
   try {
-    res = await fetch(`/api${path}`, { method, headers, body: payload });
+    res = await fetch(`${API_BASE}/api${path}`, { method, headers, body: payload });
   } catch {
     throw new ApiError(0, 'Cannot reach the server. Check that the backend is running.');
   }
@@ -77,4 +87,4 @@ export async function fetchAll<T = any>(path: string, params: Record<string, unk
 }
 
 export const documentUrl = (id: string, inline = false): string =>
-  `/api/documents/${id}/download?token=${encodeURIComponent(getToken())}${inline ? '&inline=1' : ''}`;
+  `${API_BASE}/api/documents/${id}/download?token=${encodeURIComponent(getToken())}${inline ? '&inline=1' : ''}`;

@@ -1,6 +1,6 @@
 ﻿import { useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { api } from '../../api';
+import { api, mediaUrl } from '../../api';
 import { useAuth } from '../../auth';
 import { useLookups } from '../../lib/lookups';
 import { date, dateTime, label, money, qty, today } from '../../lib/format';
@@ -218,7 +218,7 @@ export default function ItemDetail() {
             <Attachments entityType="item" entityId={it.id} />
           </div>
           <div className="stack">
-            {it.image_path && <div className="card"><img src={it.image_path} alt={it.name} style={{ width: '100%', borderRadius: 8, display: 'block' }} /></div>}
+            {it.image_path && <div className="card"><img src={mediaUrl(it.image_path)} alt={it.name} style={{ width: '100%', borderRadius: 8, display: 'block' }} /></div>}
             {it.track_inventory && (
               <>
                 <div className="card"><div className="card-head"><h3>Stock</h3>{stockBadge(it)}</div><div className="card-body">

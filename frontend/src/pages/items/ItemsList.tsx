@@ -1,5 +1,5 @@
 ﻿import { Link } from 'react-router-dom';
-import { api } from '../../api';
+import { api, mediaUrl } from '../../api';
 import { useAuth } from '../../auth';
 import { money, qty } from '../../lib/format';
 import DataTable from '../../components/DataTable';
@@ -60,7 +60,7 @@ export default function ItemsList({ composite = false }: any) {
         columns={[
           { key: 'name', label: 'Name', sort: 'name', render: (r) => (
             <div className="row" style={{ gap: 10 }}>
-              {r.image_path ? <img className="thumb" src={r.image_path} alt="" /> : <span className="thumb" />}
+              {r.image_path ? <img className="thumb" src={mediaUrl(r.image_path)} alt="" /> : <span className="thumb" />}
               <div><div className="bold">{r.name}</div><div className="small faint">{r.group_name || r.category || ''}</div></div>
             </div>) },
           { key: 'sku', label: 'SKU', sort: 'sku' },

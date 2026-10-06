@@ -1,6 +1,6 @@
 ﻿import { useEffect, useRef, useState } from 'react';
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
-import { api } from '../api';
+import { api, mediaUrl } from '../api';
 import { useAuth } from '../auth';
 import { invalidateLookups } from '../lib/lookups';
 import { dateTime, label, money, INDIAN_STATES } from '../lib/format';
@@ -47,7 +47,7 @@ function Organization() {
         <div className="form-section">
           <FormRow label="Logo" hint="Appears on invoices, orders and receipts. PNG/JPG up to 5 MB.">
             <div className="row">
-              <div className="img-drop" onClick={() => editable && logoInput.current.click()} role="button" tabIndex={0}>{f.logo_path ? <img src={f.logo_path} alt="Logo" /> : 'Upload logo'}</div>
+              <div className="img-drop" onClick={() => editable && logoInput.current.click()} role="button" tabIndex={0}>{f.logo_path ? <img src={mediaUrl(f.logo_path)} alt="Logo" /> : 'Upload logo'}</div>
               <input ref={logoInput} type="file" hidden accept="image/png,image/jpeg,image/gif,image/webp" onChange={(e) => uploadLogo(e.target.files[0])} />
               {f.logo_path && editable && <button type="button" className="btn sm danger" onClick={removeLogo}>Remove</button>}
             </div>

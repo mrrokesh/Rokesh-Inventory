@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { api } from '../api';
+import { api, mediaUrl } from '../api';
 import { useAuth } from '../auth';
 import { useLookups } from '../lib/lookups';
 import { addressLines, date, modeLabel, money, today, PAYMENT_MODES } from '../lib/format';
@@ -198,7 +198,7 @@ export function PaymentDetail({ kind }: any) {
       <div className="doc-paper mb">
         <div className="row" style={{ alignItems: 'flex-start' }}>
           <div>
-            {org?.logo_path && <img src={org.logo_path} alt="" style={{ maxHeight: 50 }} />}
+            {org?.logo_path && <img src={mediaUrl(org.logo_path)} alt="" style={{ maxHeight: 50 }} />}
             <div className="bold">{org?.legal_name || org?.name}</div>
             {addressLines(org?.address).map((l) => <div key={l} className="small muted">{l}</div>)}
           </div>

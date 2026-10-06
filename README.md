@@ -31,11 +31,34 @@ Open http://localhost:5173 and choose **Create an organization**. There is no sa
 organization, your admin login, a primary warehouse, default roles (Admin, Manager, Sales User, Purchase User,
 Warehouse User, Accountant), units and document numbering (SO-00001, PO-00001, INV-000001 …).
 
-### Production
-```
-cd frontend && npm run build
-cd ../backend && npm start   # serves the API and frontend/dist on PORT
-```
+### Production (Vercel + Render)
+
+Frontend goes to [Vercel](https://vercel.com), API to [Render](https://render.com). Use the same PostgreSQL `DATABASE_URL` as local (do not create a new hosted database unless you want one).
+
+**1. Render (API)** — New Web Service from `mrrokesh/Rokesh-Inventory`, or Blueprint `render.yaml`.
+
+- Root directory: `backend`
+- Build: `npm ci`
+- Start: `npx tsx src/server.ts`
+- Environment:
+  - `DATABASE_URL` — the Postgres URL already used in this project
+  - `JWT_SECRET` — long random string (same idea as `backend/.env`)
+  - `APP_SECRET` — optional; defaults to `JWT_SECRET` if empty
+  - `CORS_ORIGIN` — your Vercel URL, e.g. `https://rokesh-inventory.vercel.app`
+  - `APP_URL` — same Vercel URL (emails, portal, payment links)
+  - `NODE_ENV=production`
+  - Render sets `PORT` for you
+
+After the first deploy, copy the Render URL (`https://….onrender.com`). Disk uploads on Render’s free instance are wiped on restart.
+
+**2. Vercel (UI)** — Import the same GitHub repo.
+
+- Root Directory: `frontend`
+- Framework: Vite
+- Environment: `VITE_API_URL` = the Render URL with **no** trailing slash
+- Redeploy after setting it (Vite bakes this in at build time)
+
+Local `npm run dev` is unchanged: leave `VITE_API_URL` empty so Vite still proxies `/api` to `http://localhost:4000`.
 
 ## User guide
 Plain-language guides for non-technical users are in [docs/user-guide](docs/user-guide/README.md).

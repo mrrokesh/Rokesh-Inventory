@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, NavLink, Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import { addressLines, date, dateTime, label, modeLabel, money, qty, INDIAN_STATES } from '../../lib/format';
 import { Badge, EmptyState, ErrorBox, Field, Input, Select, Spinner, Textarea } from '../../components/ui';
+import { API_BASE, mediaUrl } from '../../api';
 import { useToast } from '../../components/Toast';
 
 const KEY = (slug) => `inv_portal_${slug}`;
@@ -11,7 +12,7 @@ const setTok = (slug, t) => { try { if (t) localStorage.setItem(KEY(slug), t); e
 
 function usePortalApi(slug: any, onUnauthorized?: any) {
   return useCallback(async (method: any, path: any, body?: any) => {
-    const res = await fetch(`/api/portal/${slug}${path}`, {
+    const res = await fetch(`${API_BASE}/api/portal/${slug}${path}`, {
       method, headers: { ...(body ? { 'Content-Type': 'application/json' } : {}), ...(getTok(slug) ? { Authorization: `Bearer ${getTok(slug)}` } : {}) },
       body: body ? JSON.stringify(body) : undefined,
     });
@@ -27,7 +28,7 @@ function Shell({ org, children }: any) {
     <div className="auth-page">
       <div className="auth-card">
         <div className="center mb">
-          {org?.logo_path && <img src={org.logo_path} alt="" style={{ maxHeight: 56, maxWidth: 200 }} />}
+          {org?.logo_path && <img src={mediaUrl(org.logo_path)} alt="" style={{ maxHeight: 56, maxWidth: 200 }} />}
           <h2 style={{ marginTop: 8 }}>{org?.name || 'Customer portal'}</h2>
         </div>
         {children}
@@ -305,7 +306,7 @@ export default function Portal() {
   const logout = useCallback(() => { setTok(slug, ''); setSignedIn(false); setMe(null); }, [slug]);
   const call = usePortalApi(slug, logout);
   const loadMe = useCallback(() => call('GET', '/me').then(setMe).catch(() => {}), [call]);
-  useEffect(() => { fetch(`/api/portal/${slug}/info`).then((r) => (r.ok ? r.json() : Promise.reject(new Error('This portal link is not valid')))).then(setOrg).catch(setError); }, [slug]);
+  useEffect(() => { fetch(`${API_BASE}/api/portal/${slug}/info`).then((r) => (r.ok ? r.json() : Promise.reject(new Error('This portal link is not valid')))).then(setOrg).catch(setError); }, [slug]);
   useEffect(() => { if (signedIn) loadMe(); }, [signedIn, loadMe]);
   useEffect(() => { document.title = org ? `${org.name} – Customer portal` : 'Customer portal'; }, [org]);
 
@@ -316,7 +317,7 @@ export default function Portal() {
       <Route path="*" element={!signedIn ? <Login slug={slug} org={org} onIn={() => setSignedIn(true)} /> : !me ? <Spinner /> : (
         <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
           <header className="topbar no-print" style={{ height: 'auto', padding: '10px 20px', flexWrap: 'wrap' }}>
-            {me.org.logo_path && <img src={me.org.logo_path} alt="" style={{ height: 32 }} />}
+            {me.org.logo_path && <img src={mediaUrl(me.org.logo_path)} alt="" style={{ height: 32 }} />}
             <strong>{me.org.name}</strong>
             <nav className="row wrap" style={{ gap: 4, marginLeft: 16 }}>
               {[['', 'Home'], ['invoices', 'Invoices'], ['sales-orders', 'Orders'], ['estimates', 'Quotes'], ['shipments', 'Shipments'], ['payments', 'Payments'], ['statement', 'Statement'], ['profile', 'My details']].map(([p, l]) => (
