@@ -1,4 +1,4 @@
-# Inventory (Zoho Inventory–style)
+# Rokesh Inventory
 
 Full inventory management for goods, services and composite items: purchasing, sales, multi-warehouse stock with FIFO costing, payments, credits, reports, documents and role-based users.
 
@@ -70,3 +70,5 @@ The same guides are built into the app under **Help & Guides**, and the **?** bu
 For email links, the customer portal and payment webhooks, set `APP_URL` in `backend/.env` to the public address of the app.
 Razorpay, Shiprocket and Shopify connect with your own accounts; they were built against the providers' documented APIs
 and should be tested with your test/sandbox credentials before going live.
+
+Licensed under the [Apache License 2.0](LICENSE).
