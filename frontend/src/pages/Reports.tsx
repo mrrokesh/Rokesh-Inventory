@@ -2,7 +2,7 @@
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useLookups } from '../lib/lookups';
-import { date, downloadCsv, label, money, qty } from '../lib/format';
+import { date, downloadXlsx, label, money, qty } from '../lib/format';
 import { Badge, ErrorBox, PageHead, Select, Spinner, useApi } from '../components/ui';
 import Icon from '../components/Icon';
 
@@ -60,16 +60,16 @@ export function ReportView() {
   const params = { period: period === 'custom' ? undefined : period, from: period === 'custom' ? sp.get('from') : undefined, to: period === 'custom' ? sp.get('to') : undefined, warehouse_id: sp.get('warehouse_id') || undefined };
   const { data: rep, error, loading } = useApi(`/reports/${key}`, params);
   const setParam = (k, v) => { const n = new URLSearchParams(sp); if (v) n.set(k, v); else n.delete(k); setSp(n, { replace: true }); };
-  const exportCsv = () => {
+  const exportXlsx = () => {
     const rows = rep.totals ? [...rep.rows, { ...rep.totals, [rep.columns[0].key]: 'Total' }] : rep.rows;
-    downloadCsv(`${key}-${rep.from}-${rep.to}.csv`, rep.columns, rows);
+    downloadXlsx(`${key}-${rep.from}-${rep.to}.xlsx`, rep.columns, rows);
   };
   const chartData = rep?.chart ? rep.rows.slice(0, rep.chart.limit).map((r) => ({ name: String(r[rep.chart.label]).slice(0, 18), value: Number(r[rep.chart.value]) })) : null;
 
   return (
     <div className="page">
       <PageHead title={rep?.title || 'Report'} crumb={<Link to="/reports">Reports</Link>}>
-        {rep && <button type="button" className="btn" onClick={exportCsv}><Icon name="download" size={14} className="" /> Export CSV</button>}
+        {rep && <button type="button" className="btn" onClick={exportXlsx}><Icon name="download" size={14} className="" /> Export Excel</button>}
         {rep && <button type="button" className="btn" onClick={() => window.print()}><Icon name="print" size={14} className="" /> Print / PDF</button>}
       </PageHead>
       <div className="card mb no-print"><div className="toolbar" style={{ borderBottom: 0 }}>

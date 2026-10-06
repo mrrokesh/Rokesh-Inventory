@@ -3,16 +3,31 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../auth';
 import { INDIAN_STATES } from '../lib/format';
+import { APP_NAME, APP_TAGLINE, LOGO_SRC } from '../brand';
 import { ErrorBox, Field, Input, Select, Spinner } from '../components/ui';
 
 function AuthShell({ title, subtitle, children }: any) {
   return (
-    <div className="auth-page">
-      <div className="auth-card">
-        <h1>{title}</h1>
-        {subtitle && <p className="muted" style={{ marginTop: 0 }}>{subtitle}</p>}
-        {children}
+    <div className="auth-split">
+      <div className="auth-pane">
+        <div className="auth-card">
+          <div className="auth-brand">
+            <img src={LOGO_SRC} alt="" />
+            <div>
+              <div className="auth-app-name">{APP_NAME}</div>
+              <div className="auth-app-tag">{APP_TAGLINE}</div>
+            </div>
+          </div>
+          <h1>{title}</h1>
+          {subtitle && <p className="muted" style={{ marginTop: 0 }}>{subtitle}</p>}
+          {children}
+        </div>
       </div>
+      <aside className="auth-hero">
+        <img src={LOGO_SRC} alt={APP_NAME} />
+        <p className="auth-hero-title">{APP_NAME}</p>
+        <p className="auth-hero-tag">Stock, sales, purchasing and warehouses — in one place.</p>
+      </aside>
     </div>
   );
 }
@@ -29,7 +44,7 @@ export function Login() {
     try { startSession(await api.post('/auth/login', f)); navigate('/'); } catch (err) { setError(err); } finally { setBusy(false); }
   };
   return (
-    <AuthShell title="Sign in" subtitle="Sign in to your inventory account">
+    <AuthShell title="Sign in" subtitle="Sign in to access Rokesh Inventory">
       <form className="stack" onSubmit={submit}>
         <ErrorBox error={error} />
         <Field label="Email"><Input type="email" autoComplete="email" required value={f.email} onChange={(v) => setF({ ...f, email: v })} autoFocus /></Field>

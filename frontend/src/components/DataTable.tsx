@@ -1,13 +1,13 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api, fetchAll } from '../api';
-import { downloadCsv } from '../lib/format';
+import { downloadXlsx } from '../lib/format';
 import { EmptyState, ErrorBox, Spinner, useDebounced } from './ui';
 import { useToast } from './Toast';
 import Icon from './Icon';
 
 /**
- * Server-paginated table with search, filters, sorting, selection, bulk actions and CSV export.
+ * Server-paginated table with search, filters, sorting, selection, bulk actions and Excel export.
  * columns: [{ key, label, render?: (row) => node, sort?: 'serverKey', num?: bool, csv?: (row) => value }]
  */
 export default function DataTable({
@@ -76,7 +76,7 @@ export default function DataTable({
       const rows = await fetchAll(endpoint, { ...fixedParams, ...filterValues, search: debounced, sort, dir });
       const cols = columns.filter((c) => c.csv !== false).map((c) => ({ key: c.key, label: c.label }));
       const flat = rows.map((r) => Object.fromEntries(columns.filter((c) => c.csv !== false).map((c) => [c.key, c.csv ? c.csv(r) : r[c.key]])));
-      downloadCsv(`${exportName}.csv`, cols, flat);
+      await downloadXlsx(`${exportName}.xlsx`, cols, flat);
     } catch (err) {
       toast(err.message, 'error');
     } finally {
@@ -104,7 +104,7 @@ export default function DataTable({
         {toolbarExtra}
         {exportName && (
           <button type="button" className="btn sm" onClick={doExport} disabled={exporting}>
-            <Icon name="download" size={14} className="" /> {exporting ? 'Exporting…' : 'Export CSV'}
+            <Icon name="download" size={14} className="" /> {exporting ? 'Exporting…' : 'Export Excel'}
           </button>
         )}
       </div>

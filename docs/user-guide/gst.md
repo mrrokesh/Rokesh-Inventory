@@ -22,7 +22,7 @@ Printed and emailed invoices show the split, the HSN/SAC code of each item, and 
 
 ## GST reports for filing
 
-Go to **Reports → GST**, choose the month (Custom period), and **Export CSV** to give to your accountant or to upload in the GST offline tool.
+Go to **Reports → GST**, choose the month (Custom period), and **Export Excel** to give to your accountant. Save as CSV from Excel if you need the GST offline tool.
 
 | Report | GSTR section | What it contains |
 |---|---|---|

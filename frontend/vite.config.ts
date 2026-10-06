@@ -19,6 +19,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
+          if (id.includes('node_modules/exceljs') || id.includes('node_modules/exceljs/')) return 'excel';
           if (id.includes('node_modules/recharts') || id.includes('node_modules/d3-')) return 'charts';
           if (id.includes('node_modules/react-dom') || id.includes('node_modules/react-router') || id.includes('node_modules/react/')) {
             return 'vendor';

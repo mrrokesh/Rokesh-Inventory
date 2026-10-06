@@ -1,6 +1,6 @@
 # Reports
 
-Go to **Reports** in the left menu. Each report answers one question. Pick a period at the top (and a warehouse, where it applies), then **Export CSV** to open it in Excel, or **Print / PDF**.
+Go to **Reports** in the left menu. Each report answers one question. Pick a period at the top (and a warehouse, where it applies), then **Export Excel**, or **Print / PDF**.
 
 ## Which report should I open?
 

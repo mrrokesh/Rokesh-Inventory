@@ -4,6 +4,7 @@ import { Link, NavLink, Navigate, Route, Routes, useNavigate, useParams } from '
 import { addressLines, date, dateTime, label, modeLabel, money, qty, INDIAN_STATES } from '../../lib/format';
 import { Badge, EmptyState, ErrorBox, Field, Input, Select, Spinner, Textarea } from '../../components/ui';
 import { API_BASE, mediaUrl } from '../../api';
+import { APP_NAME, LOGO_SRC } from '../../brand';
 import { useToast } from '../../components/Toast';
 
 const KEY = (slug) => `inv_portal_${slug}`;
@@ -25,14 +26,24 @@ function usePortalApi(slug: any, onUnauthorized?: any) {
 
 function Shell({ org, children }: any) {
   return (
-    <div className="auth-page">
-      <div className="auth-card">
-        <div className="center mb">
-          {org?.logo_path && <img src={mediaUrl(org.logo_path)} alt="" style={{ maxHeight: 56, maxWidth: 200 }} />}
-          <h2 style={{ marginTop: 8 }}>{org?.name || 'Customer portal'}</h2>
+    <div className="auth-split">
+      <div className="auth-pane">
+        <div className="auth-card">
+          <div className="auth-brand">
+            <img src={org?.logo_path ? mediaUrl(org.logo_path) : LOGO_SRC} alt="" />
+            <div>
+              <div className="auth-app-name">{org?.name || APP_NAME}</div>
+              <div className="auth-app-tag">Customer portal</div>
+            </div>
+          </div>
+          {children}
         </div>
-        {children}
       </div>
+      <aside className="auth-hero">
+        <img src={LOGO_SRC} alt={APP_NAME} />
+        <p className="auth-hero-title">{APP_NAME}</p>
+        <p className="auth-hero-tag">Orders, invoices and payments for your account.</p>
+      </aside>
     </div>
   );
 }
@@ -50,7 +61,8 @@ function Login({ slug, org, onIn }: any) {
   return (
     <Shell org={org}>
       <form className="stack" onSubmit={submit}>
-        <p className="muted center" style={{ margin: 0 }}>Sign in to see your orders, invoices and payments.</p>
+        <h1>Sign in</h1>
+        <p className="muted" style={{ marginTop: 0 }}>Sign in to see your orders, invoices and payments.</p>
         <ErrorBox error={error} />
         <Field label="Email"><Input type="email" required autoFocus autoComplete="email" value={f.email} onChange={(v) => setF({ ...f, email: v })} /></Field>
         <Field label="Password"><Input type="password" required autoComplete="current-password" value={f.password} onChange={(v) => setF({ ...f, password: v })} /></Field>

@@ -5,6 +5,7 @@ import { useAuth } from '../auth';
 import { label } from '../lib/format';
 import { getTheme, setTheme } from '../lib/theme';
 import { helpSlugFor } from '../pages/help/index';
+import { APP_NAME, LOGO_SRC } from '../brand';
 import Icon from './Icon';
 import { ConfirmHost, Dropdown, useDebounced } from './ui';
 
@@ -82,8 +83,8 @@ function Sidebar() {
   return (
     <nav className="sidebar no-print" aria-label="Main">
       <Link to="/" className="brand" style={{ textDecoration: 'none' }}>
-        <span className="logo"><Icon name="items" size={16} className="" /></span>
-        <span>Inventory</span>
+        <img className="brand-mark" src={LOGO_SRC} alt="" />
+        <span className="brand-name">{APP_NAME}</span>
       </Link>
       {NAV.map((g) => {
         if (g.children) {
