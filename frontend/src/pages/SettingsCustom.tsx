@@ -316,3 +316,63 @@ export function ReportingTagsSettings() {
     </>
   );
 }
+
+// ------------------------------------------------------------------ currencies
+export function CurrenciesSettings() {
+  const { can } = useAuth();
+  const toast = useToast();
+  const [busy, run] = useAction(toast);
+  const { data, reload } = useApi('/currencies');
+  const [edit, setEdit] = useState(null);
+  const editable = can('settings', 'edit');
+  if (!data) return <Spinner />;
+  const save = async () => {
+    const ok = await run(() => (edit.id ? api.put(`/currencies/${edit.id}`, edit) : api.post('/currencies', edit)), 'Currency saved');
+    if (ok) { setEdit(null); reload(); }
+  };
+  const remove = async (c) => {
+    if (!(await confirmDialog({ message: `Remove ${c.code}?`, danger: true, confirmText: 'Remove' }))) return;
+    if ((await run(() => api.del(`/currencies/${c.id}`), 'Currency removed')) !== undefined) reload();
+  };
+  const known = Object.entries(data.known).filter(([k]) => k !== data.base && !data.currencies.some((c) => c.code === k));
+  return (
+    <>
+      <PageHead title="Currencies">
+        {editable && <button type="button" className="btn primary" onClick={() => setEdit({ code: known[0]?.[0] || '', exchange_rate: '' })}>+ New currency</button>}
+      </PageHead>
+      <p className="muted" style={{ marginTop: 0 }}>
+        Sell to or buy from businesses abroad in their own currency. Add the currency here with today’s exchange rate, then choose it on the customer or vendor.
+        Their invoices, bills and payments are then in that currency; reports and stock values are always shown in your base currency (<b>{data.base}</b>).
+      </p>
+      <div className="card table-wrap"><table className="table">
+        <thead><tr><th>Currency</th><th className="num">Exchange rate</th><th>Updated</th><th className="num">Contacts</th>{editable && <th />}</tr></thead>
+        <tbody>
+          <tr><td><b>{data.base}</b> · {data.base_name} <span className="badge green">Base</span></td><td className="num">1</td><td /><td />{editable && <td />}</tr>
+          {data.currencies.map((c) => (
+            <tr key={c.id}>
+              <td><b>{c.code}</b> · {c.name}</td>
+              <td className="num">1 {c.code} = {Number(c.exchange_rate)} {data.base}</td>
+              <td className="small faint">{new Date(c.updated_at).toLocaleDateString('en-IN')}</td>
+              <td className="num">{c.contacts}</td>
+              {editable && <td className="right" style={{ whiteSpace: 'nowrap' }}>
+                <button type="button" className="btn sm" onClick={() => setEdit({ ...c, exchange_rate: Number(c.exchange_rate) })}>Update rate</button>
+                {!c.contacts && <button type="button" className="btn sm danger" disabled={busy} onClick={() => remove(c)}>Remove</button>}
+              </td>}
+            </tr>
+          ))}
+        </tbody>
+      </table></div>
+      {edit && (
+        <Modal title={edit.id ? `Exchange rate for ${edit.code}` : 'New currency'} onClose={() => setEdit(null)}
+          footer={<><button type="button" className="btn primary" disabled={busy || !edit.code || !(Number(edit.exchange_rate) > 0)} onClick={save}>Save</button><button type="button" className="btn" onClick={() => setEdit(null)}>Cancel</button></>}>
+          <div className="stack">
+            {!edit.id && <Field label="Currency"><Select value={edit.code} onChange={(v) => setEdit({ ...edit, code: v })} options={known.map(([k, n]: any) => [k, `${k} – ${n}`])} /></Field>}
+            <Field label="Exchange rate" required hint={`How many ${data.base} one ${edit.code || 'unit'} is worth today. New documents use this rate; you can still change it on each document.`}>
+              <div className="row" style={{ gap: 6 }}><span className="nowrap">1 {edit.code} =</span><Input type="number" min="0.000001" step="any" value={edit.exchange_rate} onChange={(v) => setEdit({ ...edit, exchange_rate: v })} autoFocus /><span>{data.base}</span></div>
+            </Field>
+          </div>
+        </Modal>
+      )}
+    </>
+  );
+}

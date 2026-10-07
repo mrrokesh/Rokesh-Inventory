@@ -203,7 +203,7 @@ const REPORTS: any = {
     description: 'Items classed A (top 70% of sales value), B (next 20%) and C (last 10%).',
     run: async ({ org, from, to }) => {
       const { rows } = await query(
-        `SELECT i.name, i.sku, SUM(l.quantity) AS quantity, SUM(l.amount * (1 - d.discount_percent / 100)) AS sales
+        `SELECT i.name, i.sku, SUM(l.quantity) AS quantity, SUM(l.amount * (1 - d.discount_percent / 100) * d.exchange_rate) AS sales
            FROM invoice_lines l JOIN invoices d ON d.id = l.doc_id JOIN items i ON i.id = l.item_id
           WHERE d.org_id = $1 AND d.status NOT IN ('draft','void') AND d.doc_date BETWEEN $2 AND $3
           GROUP BY i.id ORDER BY sales DESC`,
@@ -233,7 +233,7 @@ const REPORTS: any = {
     run: async ({ org, from, to }) => {
       const { rows } = await query(
         `WITH s AS (
-           SELECT l.item_id, SUM(l.quantity) AS quantity, SUM(l.amount * (1 - d.discount_percent / 100)) AS sales
+           SELECT l.item_id, SUM(l.quantity) AS quantity, SUM(l.amount * (1 - d.discount_percent / 100) * d.exchange_rate) AS sales
              FROM invoice_lines l JOIN invoices d ON d.id = l.doc_id
             WHERE d.org_id = $1 AND d.status NOT IN ('draft','void') AND d.doc_date BETWEEN $2 AND $3 AND l.item_id IS NOT NULL
             GROUP BY l.item_id),
@@ -260,8 +260,8 @@ const REPORTS: any = {
     description: 'Invoice count and sales per customer.',
     run: async ({ org, from, to }) => {
       const { rows } = await query(
-        `SELECT c.display_name AS customer, COUNT(*)::int AS invoices, SUM(d.sub_total - d.discount_total) AS sales,
-                SUM(d.tax_total) AS tax, SUM(d.total) AS total, SUM(d.balance) AS balance
+        `SELECT c.display_name AS customer, COUNT(*)::int AS invoices, SUM((d.sub_total - d.discount_total) * d.exchange_rate) AS sales,
+                SUM(d.tax_total * d.exchange_rate) AS tax, SUM(d.total * d.exchange_rate) AS total, SUM(d.balance * d.exchange_rate) AS balance
            FROM invoices d JOIN contacts c ON c.id = d.contact_id
           WHERE d.org_id = $1 AND d.status NOT IN ('draft','void') AND d.doc_date BETWEEN $2 AND $3
           GROUP BY c.id ORDER BY total DESC`,
@@ -280,7 +280,7 @@ const REPORTS: any = {
     description: 'Invoiced sales grouped by salesperson.',
     run: async ({ org, from, to }) => {
       const { rows } = await query(
-        `SELECT COALESCE(d.salesperson, '(none)') AS salesperson, COUNT(*)::int AS invoices, SUM(d.sub_total - d.discount_total) AS sales, SUM(d.total) AS total
+        `SELECT COALESCE(d.salesperson, '(none)') AS salesperson, COUNT(*)::int AS invoices, SUM((d.sub_total - d.discount_total) * d.exchange_rate) AS sales, SUM(d.total * d.exchange_rate) AS total
            FROM invoices d WHERE d.org_id = $1 AND d.status NOT IN ('draft','void') AND d.doc_date BETWEEN $2 AND $3
           GROUP BY 1 ORDER BY total DESC`,
         [org, from, to],
@@ -314,12 +314,12 @@ const REPORTS: any = {
     run: async ({ org }) => {
       const { rows } = await query(
         `SELECT c.display_name AS customer,
-                COALESCE(SUM(d.balance) FILTER (WHERE d.due_date >= CURRENT_DATE),0) AS current,
-                COALESCE(SUM(d.balance) FILTER (WHERE CURRENT_DATE - d.due_date BETWEEN 1 AND 15),0) AS d1_15,
-                COALESCE(SUM(d.balance) FILTER (WHERE CURRENT_DATE - d.due_date BETWEEN 16 AND 30),0) AS d16_30,
-                COALESCE(SUM(d.balance) FILTER (WHERE CURRENT_DATE - d.due_date BETWEEN 31 AND 45),0) AS d31_45,
-                COALESCE(SUM(d.balance) FILTER (WHERE CURRENT_DATE - d.due_date > 45),0) AS d45_plus,
-                SUM(d.balance) AS total
+                COALESCE(SUM(d.balance * d.exchange_rate) FILTER (WHERE d.due_date >= CURRENT_DATE),0) AS current,
+                COALESCE(SUM(d.balance * d.exchange_rate) FILTER (WHERE CURRENT_DATE - d.due_date BETWEEN 1 AND 15),0) AS d1_15,
+                COALESCE(SUM(d.balance * d.exchange_rate) FILTER (WHERE CURRENT_DATE - d.due_date BETWEEN 16 AND 30),0) AS d16_30,
+                COALESCE(SUM(d.balance * d.exchange_rate) FILTER (WHERE CURRENT_DATE - d.due_date BETWEEN 31 AND 45),0) AS d31_45,
+                COALESCE(SUM(d.balance * d.exchange_rate) FILTER (WHERE CURRENT_DATE - d.due_date > 45),0) AS d45_plus,
+                SUM(d.balance * d.exchange_rate) AS total
            FROM invoices d JOIN contacts c ON c.id = d.contact_id
           WHERE d.org_id = $1 AND d.status IN ('sent','partially_paid') GROUP BY c.id ORDER BY total DESC`,
         [org],
@@ -336,7 +336,7 @@ const REPORTS: any = {
     description: 'Customer payments recorded in the period.',
     run: async ({ org, from, to }) => {
       const { rows } = await query(
-        `SELECT d.payment_date, d.number, c.display_name AS customer, d.mode, d.reference, d.amount, d.unused_amount
+        `SELECT d.payment_date, d.number, c.display_name AS customer, d.mode, d.reference, d.amount * d.exchange_rate AS amount, d.unused_amount * d.exchange_rate AS unused_amount
            FROM payments_received d JOIN contacts c ON c.id = d.contact_id
           WHERE d.org_id = $1 AND d.payment_date BETWEEN $2 AND $3 ORDER BY d.payment_date DESC`,
         [org, from, to],
@@ -356,8 +356,8 @@ const REPORTS: any = {
     description: 'Bills and purchase value per vendor.',
     run: async ({ org, from, to }) => {
       const { rows } = await query(
-        `SELECT c.display_name AS vendor, COUNT(*)::int AS bills, SUM(d.sub_total - d.discount_total) AS amount, SUM(d.tax_total) AS tax,
-                SUM(d.total) AS total, SUM(d.balance) AS balance
+        `SELECT c.display_name AS vendor, COUNT(*)::int AS bills, SUM((d.sub_total - d.discount_total) * d.exchange_rate) AS amount, SUM(d.tax_total * d.exchange_rate) AS tax,
+                SUM(d.total * d.exchange_rate) AS total, SUM(d.balance * d.exchange_rate) AS balance
            FROM bills d JOIN contacts c ON c.id = d.contact_id
           WHERE d.org_id = $1 AND d.status NOT IN ('draft','void') AND d.doc_date BETWEEN $2 AND $3
           GROUP BY c.id ORDER BY total DESC`,
@@ -376,8 +376,8 @@ const REPORTS: any = {
     description: 'Quantity and value purchased per item (from bills).',
     run: async ({ org, from, to }) => {
       const { rows } = await query(
-        `SELECT COALESCE(i.name, l.description) AS name, i.sku, SUM(l.quantity) AS quantity, SUM(l.amount * (1 - d.discount_percent / 100)) AS amount,
-                CASE WHEN SUM(l.quantity) > 0 THEN SUM(l.amount * (1 - d.discount_percent / 100)) / SUM(l.quantity) ELSE 0 END AS avg_cost
+        `SELECT COALESCE(i.name, l.description) AS name, i.sku, SUM(l.quantity) AS quantity, SUM(l.amount * (1 - d.discount_percent / 100) * d.exchange_rate) AS amount,
+                CASE WHEN SUM(l.quantity) > 0 THEN SUM(l.amount * (1 - d.discount_percent / 100) * d.exchange_rate) / SUM(l.quantity) ELSE 0 END AS avg_cost
            FROM bill_lines l JOIN bills d ON d.id = l.doc_id LEFT JOIN items i ON i.id = l.item_id
           WHERE d.org_id = $1 AND d.status NOT IN ('draft','void') AND d.doc_date BETWEEN $2 AND $3
           GROUP BY 1, 2 ORDER BY amount DESC`,
@@ -415,12 +415,12 @@ const REPORTS: any = {
     run: async ({ org }) => {
       const { rows } = await query(
         `SELECT c.display_name AS vendor,
-                COALESCE(SUM(d.balance) FILTER (WHERE d.due_date >= CURRENT_DATE),0) AS current,
-                COALESCE(SUM(d.balance) FILTER (WHERE CURRENT_DATE - d.due_date BETWEEN 1 AND 15),0) AS d1_15,
-                COALESCE(SUM(d.balance) FILTER (WHERE CURRENT_DATE - d.due_date BETWEEN 16 AND 30),0) AS d16_30,
-                COALESCE(SUM(d.balance) FILTER (WHERE CURRENT_DATE - d.due_date BETWEEN 31 AND 45),0) AS d31_45,
-                COALESCE(SUM(d.balance) FILTER (WHERE CURRENT_DATE - d.due_date > 45),0) AS d45_plus,
-                SUM(d.balance) AS total
+                COALESCE(SUM(d.balance * d.exchange_rate) FILTER (WHERE d.due_date >= CURRENT_DATE),0) AS current,
+                COALESCE(SUM(d.balance * d.exchange_rate) FILTER (WHERE CURRENT_DATE - d.due_date BETWEEN 1 AND 15),0) AS d1_15,
+                COALESCE(SUM(d.balance * d.exchange_rate) FILTER (WHERE CURRENT_DATE - d.due_date BETWEEN 16 AND 30),0) AS d16_30,
+                COALESCE(SUM(d.balance * d.exchange_rate) FILTER (WHERE CURRENT_DATE - d.due_date BETWEEN 31 AND 45),0) AS d31_45,
+                COALESCE(SUM(d.balance * d.exchange_rate) FILTER (WHERE CURRENT_DATE - d.due_date > 45),0) AS d45_plus,
+                SUM(d.balance * d.exchange_rate) AS total
            FROM bills d JOIN contacts c ON c.id = d.contact_id
           WHERE d.org_id = $1 AND d.status IN ('open','partially_paid') GROUP BY c.id ORDER BY total DESC`,
         [org],
@@ -437,7 +437,7 @@ const REPORTS: any = {
     description: 'Vendor payments recorded in the period.',
     run: async ({ org, from, to }) => {
       const { rows } = await query(
-        `SELECT d.payment_date, d.number, c.display_name AS vendor, d.mode, d.reference, d.amount, d.unused_amount
+        `SELECT d.payment_date, d.number, c.display_name AS vendor, d.mode, d.reference, d.amount * d.exchange_rate AS amount, d.unused_amount * d.exchange_rate AS unused_amount
            FROM payments_made d JOIN contacts c ON c.id = d.contact_id
           WHERE d.org_id = $1 AND d.payment_date BETWEEN $2 AND $3 ORDER BY d.payment_date DESC`,
         [org, from, to],
@@ -458,8 +458,8 @@ const REPORTS: any = {
     run: async ({ org, from, to }) => {
       const sql = (lines, docs, statuses, sign) => `
         SELECT COALESCE(t.name, l.tax_rate || '%') AS tax, l.tax_rate,
-               ${sign} * SUM(l.amount * (1 - d.discount_percent / 100)) AS taxable,
-               ${sign} * SUM(l.amount * (1 - d.discount_percent / 100) * l.tax_rate / 100) AS tax_amount
+               ${sign} * SUM(l.amount * (1 - d.discount_percent / 100) * d.exchange_rate) AS taxable,
+               ${sign} * SUM(l.amount * (1 - d.discount_percent / 100) * d.exchange_rate * l.tax_rate / 100) AS tax_amount
           FROM ${lines} l JOIN ${docs} d ON d.id = l.doc_id LEFT JOIN taxes t ON t.id = l.tax_id
          WHERE d.org_id = $1 AND d.status IN (${statuses}) AND d.doc_date BETWEEN $2 AND $3 AND l.tax_rate > 0
          GROUP BY 1, 2`;
@@ -497,15 +497,15 @@ const REPORTS: any = {
     description: 'Sales, cost of goods sold, gross profit and other expenses for the period.',
     run: async ({ org, from, to }) => {
       const one = async (sql) => Number((await query(sql, [org, from, to])).rows[0].v) || 0;
-      const sales = await one(`SELECT COALESCE(SUM(sub_total - discount_total + shipping_charge + adjustment),0) AS v FROM invoices
+      const sales = await one(`SELECT COALESCE(SUM((sub_total - discount_total + shipping_charge + adjustment) * exchange_rate),0) AS v FROM invoices
                                 WHERE org_id = $1 AND status NOT IN ('draft','void') AND doc_date BETWEEN $2 AND $3`);
-      const returns = await one(`SELECT COALESCE(SUM(sub_total - discount_total + shipping_charge + adjustment),0) AS v FROM credit_notes
+      const returns = await one(`SELECT COALESCE(SUM((sub_total - discount_total + shipping_charge + adjustment) * exchange_rate),0) AS v FROM credit_notes
                                   WHERE org_id = $1 AND status IN ('open','closed') AND doc_date BETWEEN $2 AND $3`);
       const cogs = await one(`SELECT COALESCE(-SUM(value),0) AS v FROM stock_movements
                                WHERE org_id = $1 AND source_type IN ('shipment','invoice','sales_return') AND movement_date BETWEEN $2 AND $3`);
       const adjustments = await one(`SELECT COALESCE(-SUM(value),0) AS v FROM stock_movements
                                       WHERE org_id = $1 AND source_type = 'inventory_adjustment' AND movement_date BETWEEN $2 AND $3`);
-      const expenses = await one(`SELECT COALESCE(SUM(l.amount * (1 - d.discount_percent / 100)),0) AS v
+      const expenses = await one(`SELECT COALESCE(SUM(l.amount * (1 - d.discount_percent / 100) * d.exchange_rate),0) AS v
                                     FROM bill_lines l JOIN bills d ON d.id = l.doc_id LEFT JOIN items i ON i.id = l.item_id
                                    WHERE d.org_id = $1 AND d.status NOT IN ('draft','void') AND d.doc_date BETWEEN $2 AND $3
                                      AND (i.id IS NULL OR NOT i.track_inventory)`);
@@ -532,9 +532,9 @@ const REPORTS: any = {
 // ---------------------------------------------------------------- GST (India)
 // Line-level taxable value and tax split. Intra-state (place of supply = organization state) → CGST+SGST, otherwise IGST.
 const gstLines = (lines, docs, statuses, dateCol = 'd.doc_date') => `
-  SELECT d.id AS doc_id, d.number, ${dateCol} AS doc_date, d.total, c.display_name, c.gstin, c.gst_treatment,
+  SELECT d.id AS doc_id, d.number, ${dateCol} AS doc_date, d.total * d.exchange_rate AS total, c.display_name, c.gstin, c.gst_treatment,
          COALESCE(d.place_of_supply, c.place_of_supply, $4) AS pos, l.tax_rate, l.quantity, i.hsn_sac, COALESCE(i.unit, 'nos') AS unit,
-         l.amount * (1 - d.discount_percent / 100) AS taxable,
+         l.amount * (1 - d.discount_percent / 100) * d.exchange_rate AS taxable,
          (lower(COALESCE(d.place_of_supply, c.place_of_supply, $4)) <> lower($4)) AS inter
     FROM ${lines} l JOIN ${docs} d ON d.id = l.doc_id JOIN contacts c ON c.id = d.contact_id LEFT JOIN items i ON i.id = l.item_id
    WHERE d.org_id = $1 AND d.status IN (${statuses}) AND ${dateCol} BETWEEN $2 AND $3`;

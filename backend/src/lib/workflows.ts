@@ -256,7 +256,7 @@ export function fillPlaceholders(text, ctx) {
     const v = fieldValue(ctx.rec, key);
     if (v === undefined || v === null) return '';
     if (f?.type === 'date' || v instanceof Date) return prettyDate(v);
-    if (f?.type === 'number' && !f.custom && /total|balance|price|limit/.test(key)) return money(v, ctx.org.currency);
+    if (f?.type === 'number' && !f.custom && /total|balance|price|limit/.test(key)) return money(v, ctx.rec.currency || ctx.org.currency);
     if (typeof v === 'boolean') return v ? 'Yes' : 'No';
     return String(v);
   });

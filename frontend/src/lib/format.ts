@@ -1,13 +1,15 @@
 let currency = 'INR';
 export const setCurrency = (c) => { currency = c || 'INR'; };
+export const baseCurrency = () => currency;
 
 const moneyFmt = new Map();
-export function money(v: any, { symbol = true }: { symbol?: boolean } = {}) {
+export function money(v: any, { symbol = true, currency: cur = null }: { symbol?: boolean; currency?: string | null } = {}) {
   const n = Number(v) || 0;
-  const key = `${currency}-${symbol}`;
+  const code = cur || currency;
+  const key = `${code}-${symbol}`;
   if (!moneyFmt.has(key)) {
     moneyFmt.set(key, symbol
-      ? new Intl.NumberFormat('en-IN', { style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: code, minimumFractionDigits: 2, maximumFractionDigits: 2 })
       : new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
   }
   return moneyFmt.get(key).format(n);

@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, mediaUrl } from '../api';
 import { useAuth } from '../auth';
 import { useLookups } from '../lib/lookups';
-import { addressLines, date, modeLabel, money, today, PAYMENT_MODES } from '../lib/format';
+import { addressLines, baseCurrency, date, modeLabel, money, today, PAYMENT_MODES } from '../lib/format';
 import DataTable from '../components/DataTable';
 import { ContactPicker } from '../components/Pickers';
 import { Attachments, History } from '../components/Attachments';
@@ -33,8 +33,8 @@ export function PaymentsList({ kind }: any) {
           { key: 'contact_name', label: c.contactType === 'customer' ? 'Customer' : 'Vendor', sort: 'contact' },
           { key: 'applied_to', label: `${c.docLabel}#` },
           { key: 'mode', label: 'Mode', render: (r) => modeLabel(r.mode) },
-          { key: 'amount', label: 'Amount', num: true, sort: 'amount', render: (r) => money(r.amount) },
-          { key: 'unused_amount', label: 'Unused', num: true, render: (r) => money(r.unused_amount) },
+          { key: 'amount', label: 'Amount', num: true, sort: 'amount', render: (r) => money(r.amount, { currency: r.currency }) },
+          { key: 'unused_amount', label: 'Unused', num: true, render: (r) => money(r.unused_amount, { currency: r.currency }) },
         ]} />
     </div>
   );
@@ -48,13 +48,24 @@ export function PaymentForm({ kind }: any) {
   const navigate = useNavigate();
   const toast = useToast();
   const [contact, setContact] = useState(null);
-  const [f, setF] = useState({ number: '', payment_date: today(), amount: '', mode: 'bank_transfer', reference: '', bank_charges: '', notes: '' });
+  const [f, setF] = useState<any>({ number: '', payment_date: today(), amount: '', mode: 'bank_transfer', reference: '', bank_charges: '', notes: '', exchange_rate: null });
   const [docs, setDocs] = useState<any[]>([]);
   const [alloc, setAlloc] = useState<any>({});
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const contactApi = c.contactType === 'customer' ? '/customers' : '/vendors';
+  // Payments are in the contact's currency; a foreign currency needs today's exchange rate.
+  const payCurrency = (contact?.currency || baseCurrency()).toUpperCase();
+  const foreign = payCurrency !== baseCurrency();
+  const pm = (v, o: any = {}) => money(v, { ...o, currency: payCurrency });
+  const [rate, setRate] = useState('');
+  useEffect(() => {
+    if (!foreign) { setRate(''); return; }
+    if (editing && Number(f.exchange_rate) > 0 && Number(f.exchange_rate) !== 1) { setRate(String(f.exchange_rate)); return; }
+    api.get('/currencies').then((r) => { const x = r.currencies.find((y) => y.code === payCurrency); setRate(x ? String(Number(x.exchange_rate)) : ''); }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [payCurrency, foreign]);
 
   const loadDocs = async (contactId: any, current: any[] = []) => {
     const r: any = await api.get(c.docApi, { contact_id: contactId, status: 'unpaid', per_page: 200, sort: 'date', dir: 'asc' });
@@ -71,8 +82,8 @@ export function PaymentForm({ kind }: any) {
       try {
         if (editing) {
           const p = await api.get(`${c.api}/${id}`);
-          setContact({ id: p.contact_id, display_name: p.contact_name });
-          setF({ number: p.number, payment_date: p.payment_date, amount: p.amount, mode: p.mode, reference: p.reference || '', bank_charges: p.bank_charges || '', notes: p.notes || '' });
+          setContact({ id: p.contact_id, display_name: p.contact_name, currency: p.currency });
+          setF({ number: p.number, payment_date: p.payment_date, amount: p.amount, mode: p.mode, reference: p.reference || '', bank_charges: p.bank_charges || '', notes: p.notes || '', exchange_rate: p.exchange_rate });
           setAlloc(Object.fromEntries(p.allocations.map((a) => [a.doc_id, a.amount])));
           await loadDocs(p.contact_id, p.allocations);
         } else {
@@ -115,7 +126,8 @@ export function PaymentForm({ kind }: any) {
     setBusy(true); setError(null);
     try {
       if (!contact) throw new Error(`Select a ${c.contactType}`);
-      const body = { ...f, contact_id: contact.id, allocations: Object.entries(alloc).filter(([, v]) => Number(v) > 0).map(([docId, v]) => ({ doc_id: Number(docId), amount: v })) };
+      if (foreign && !(Number(rate) > 0)) throw new Error(`Enter the exchange rate for ${payCurrency}`);
+      const body = { ...f, exchange_rate: foreign ? Number(rate) : null, contact_id: contact.id, allocations: Object.entries(alloc).filter(([, v]) => Number(v) > 0).map(([docId, v]) => ({ doc_id: Number(docId), amount: v })) };
       const saved = editing ? await api.put(`${c.api}/${id}`, body) : await api.post(c.api, body);
       toast(`Payment ${saved.number} recorded`);
       navigate(`${c.path}/${saved.id}`);
@@ -133,9 +145,14 @@ export function PaymentForm({ kind }: any) {
             <Field label={c.contactType === 'customer' ? 'Customer name' : 'Vendor name'} required>
               <ContactPicker type={c.contactType} value={contact?.id} valueLabel={contact?.display_name} disabled={editing} onSelect={pickContact} autoFocus={!contact} />
             </Field>
-            <Field label={c.kind === 'received' ? 'Amount received' : 'Payment made'} required>
+            <Field label={`${c.kind === 'received' ? 'Amount received' : 'Payment made'}${foreign ? ` (${payCurrency})` : ''}`} required>
               <Input type="number" min="0.01" step="0.01" required value={f.amount} onChange={(v) => setF({ ...f, amount: v })} />
             </Field>
+            {foreign && (
+              <Field label={`Exchange rate (${payCurrency})`} required hint={`How many ${baseCurrency()} you got for 1 ${payCurrency}`}>
+                <div className="row" style={{ gap: 6 }}><span className="small nowrap">1 {payCurrency} =</span><Input type="number" min="0.000001" step="any" value={rate} onChange={setRate} required /><span className="small">{baseCurrency()}</span></div>
+              </Field>
+            )}
             {c.kind === 'received' && <Field label="Bank charges (if any)"><Input type="number" min="0" step="0.01" value={f.bank_charges} onChange={(v) => setF({ ...f, bank_charges: v })} /></Field>}
             <Field label="Payment date" required><Input type="date" required value={f.payment_date} onChange={(v) => setF({ ...f, payment_date: v })} /></Field>
             <Field label="Payment#"><Input value={f.number} onChange={(v) => setF({ ...f, number: v })} disabled={editing} /></Field>
@@ -150,16 +167,16 @@ export function PaymentForm({ kind }: any) {
               <table className="table">
                 <thead><tr><th>Date</th><th>{c.docLabel}#</th><th>Due date</th><th className="num">Amount</th><th className="num">Amount due</th><th className="num" style={{ width: 160 }}>Payment</th></tr></thead>
                 <tbody>{docs.map((d) => (
-                  <tr key={d.id}><td>{date(d.doc_date)}</td><td>{d.number}</td><td>{date(d.due_date)}</td><td className="num">{money(d.total)}</td><td className="num">{money(d.balance)}</td>
+                  <tr key={d.id}><td>{date(d.doc_date)}</td><td>{d.number}</td><td>{date(d.due_date)}</td><td className="num">{pm(d.total)}</td><td className="num">{pm(d.balance)}</td>
                     <td><input className="input num" type="number" min="0" max={d.balance} step="0.01" value={alloc[d.id] ?? ''} onChange={(e) => setAlloc({ ...alloc, [d.id]: e.target.value })} />
                       <button type="button" className="btn link small" onClick={() => setAlloc({ ...alloc, [d.id]: d.balance })}>Pay in full</button></td></tr>
                 ))}</tbody>
               </table>
             )}
             <div className="totals" style={{ margin: 16, marginLeft: 'auto' }}>
-              <div className="t-row"><span>Amount {c.kind === 'received' ? 'received' : 'paid'}</span><span>{money(amount)}</span></div>
-              <div className="t-row"><span>Amount used for payments</span><span>{money(allocated)}</span></div>
-              <div className="t-row grand"><span>Amount in excess</span><span style={{ color: amount - allocated < 0 ? 'var(--red)' : undefined }}>{money(amount - allocated)}</span></div>
+              <div className="t-row"><span>Amount {c.kind === 'received' ? 'received' : 'paid'}</span><span>{pm(amount)}</span></div>
+              <div className="t-row"><span>Amount used for payments</span><span>{pm(allocated)}</span></div>
+              <div className="t-row grand"><span>Amount in excess</span><span style={{ color: amount - allocated < 0 ? 'var(--red)' : undefined }}>{pm(amount - allocated)}</span></div>
             </div>
           </div>
         )}
@@ -184,6 +201,7 @@ export function PaymentDetail({ kind }: any) {
   const { data: p, error } = useApi(`${c.api}/${id}`);
   if (error) return <div className="page"><ErrorBox error={error} /></div>;
   if (!p) return <div className="page"><Spinner /></div>;
+  const pm = (v, o: any = {}) => money(v, { ...o, currency: p.currency });
   const remove = async () => {
     if (!(await confirmDialog({ message: `Delete payment ${p.number}? The ${c.docLabel.toLowerCase()}s it paid will become unpaid again.`, danger: true, confirmText: 'Delete' }))) return;
     if ((await run(() => api.del(`${c.api}/${p.id}`), 'Payment deleted')) !== undefined) navigate(c.path);
@@ -211,11 +229,12 @@ export function PaymentDetail({ kind }: any) {
             <dt>Payment#</dt><dd>{p.number}</dd>
             <dt>Reference#</dt><dd>{p.reference || '—'}</dd>
             <dt>Payment mode</dt><dd>{modeLabel(p.mode)}</dd>
-            {p.bank_charges > 0 && <><dt>Bank charges</dt><dd>{money(p.bank_charges)}</dd></>}
+            {p.currency && p.currency !== baseCurrency() && <><dt>Exchange rate</dt><dd>1 {p.currency} = {Number(p.exchange_rate)} {baseCurrency()} <span className="small faint">({money(Number(p.amount) * Number(p.exchange_rate))})</span></dd></>}
+            {p.bank_charges > 0 && <><dt>Bank charges</dt><dd>{pm(p.bank_charges)}</dd></>}
           </dl>
           <div className="card" style={{ background: 'var(--green)', color: '#fff', padding: 18, textAlign: 'center' }}>
             <div className="small">Amount {c.kind === 'received' ? 'received' : 'paid'}</div>
-            <div style={{ fontSize: 24, fontWeight: 600 }}>{money(p.amount)}</div>
+            <div style={{ fontSize: 24, fontWeight: 600 }}>{pm(p.amount)}</div>
           </div>
         </div>
         <div className="mt"><div className="small muted">{c.kind === 'received' ? 'Received from' : 'Paid to'}</div>
@@ -225,10 +244,10 @@ export function PaymentDetail({ kind }: any) {
           <thead><tr><th>{c.docLabel}#</th><th>{c.docLabel} date</th><th className="num">{c.docLabel} amount</th><th className="num">Payment amount</th></tr></thead>
           <tbody>
             {p.allocations.length === 0 && <tr><td colSpan={4} className="faint">Not applied to any {c.docLabel.toLowerCase()}.</td></tr>}
-            {p.allocations.map((a) => <tr key={a.id}><td><Link to={`${c.docPath}/${a.doc_id}`}>{a.doc_number}</Link></td><td>{date(a.doc_date)}</td><td className="num">{money(a.doc_total)}</td><td className="num">{money(a.amount)}</td></tr>)}
+            {p.allocations.map((a) => <tr key={a.id}><td><Link to={`${c.docPath}/${a.doc_id}`}>{a.doc_number}</Link></td><td>{date(a.doc_date)}</td><td className="num">{pm(a.doc_total)}</td><td className="num">{pm(a.amount)}</td></tr>)}
           </tbody>
         </table>
-        {p.unused_amount > 0 && <div className="mt right">Amount in excess (unused credit): <strong>{money(p.unused_amount)}</strong></div>}
+        {p.unused_amount > 0 && <div className="mt right">Amount in excess (unused credit): <strong>{pm(p.unused_amount)}</strong></div>}
         {p.notes && <div className="mt small muted" style={{ whiteSpace: 'pre-wrap' }}>{p.notes}</div>}
       </div>
       <div className="stack">

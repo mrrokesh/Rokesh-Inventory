@@ -49,7 +49,7 @@ export function documentHtml(cfg, doc, org, extras: any = {}) {
   const cfs = t.show_custom_fields
     ? (extras.fields || []).filter((d) => d.show_in_pdf).map((d) => [d.label, cfText(d, doc.custom_fields?.[d.field_key])]).filter(([, v]) => v)
     : [];
-  const cur = org.currency || 'INR';
+  const cur = doc.currency || org.currency || 'INR';
   const gst = taxBreakdown(doc, org.state);
   const rows = doc.lines.map((l, i) => `<tr>
       <td style="padding:8px;border-bottom:1px solid #eee">${i + 1}</td>
@@ -134,7 +134,7 @@ async function buildDocEmail(req, entityType, entityId) {
   const { rows: [contact] } = await query('SELECT portal_enabled, email FROM contacts WHERE id = $1', [doc.contact_id]);
   const portal = contact.portal_enabled && org.portal_slug ? `${appUrl()}/portal/${org.portal_slug}` : null;
   const button = doc.payment_link_url && ['sent', 'partially_paid'].includes(doc.status)
-    ? { label: `Pay ${inr(doc.balance, org.currency)} online`, url: doc.payment_link_url }
+    ? { label: `Pay ${inr(doc.balance, doc.currency || org.currency)} online`, url: doc.payment_link_url }
     : portal ? { label: 'View in customer portal', url: portal } : null;
   const extras = await documentExtras({ query }, req.orgId, entityType);
   return { cfg, doc, org, contact, button, extras };
@@ -147,7 +147,7 @@ r.get('/compose/:entityType/:id', async (req, res) => {
     configured,
     to: contact.email || doc.contact_email || '',
     subject: `${cfg.label} ${doc.number} from ${org.name}`,
-    message: `Dear ${doc.contact_name},\n\nPlease find ${cfg.label.toLowerCase()} ${doc.number} for ${inr(doc.total, org.currency)} below.${
+    message: `Dear ${doc.contact_name},\n\nPlease find ${cfg.label.toLowerCase()} ${doc.number} for ${inr(doc.total, doc.currency || org.currency)} below.${
       doc.due_date && cfg.table === 'invoices' ? `\nIt is due on ${fmtDate(doc.due_date)}.` : ''}\n\nThank you for your business.\n${org.name}`,
   });
 });

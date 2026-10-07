@@ -91,6 +91,7 @@ export function ContactForm({ type }: any) {
   const navigate = useNavigate();
   const toast = useToast();
   const priceLists = useApi('/price-lists');
+  const currencies = useApi('/currencies');
   const [tab, setTab] = useState('other');
   const [f, setF] = useState({
     customer_type: 'business', salutation: '', first_name: '', last_name: '', company_name: '', display_name: '', email: '', phone: '', mobile: '',
@@ -173,7 +174,10 @@ export function ContactForm({ type }: any) {
                 )}
                 <FormRow label="Place of supply"><Select value={f.place_of_supply} onChange={set('place_of_supply')} options={INDIAN_STATES.map((s) => [s, s])} placeholder="Select" /></FormRow>
                 <FormRow label="PAN"><Input value={f.pan} maxLength={10} onChange={(v) => set('pan')(v.toUpperCase())} /></FormRow>
-                <FormRow label="Currency"><Input value={f.currency} maxLength={3} onChange={(v) => set('currency')(v.toUpperCase())} /></FormRow>
+                <FormRow label="Currency" hint="Their invoices or bills will be in this currency. Add more under Settings → Currencies.">
+                  <Select value={f.currency || currencies.data?.base || 'INR'} onChange={set('currency')}
+                    options={[[currencies.data?.base || 'INR', `${currencies.data?.base || 'INR'} (base)`], ...(currencies.data?.currencies || []).map((c) => [c.code, `${c.code} – ${c.name}`])]} />
+                </FormRow>
                 <FormRow label="Payment terms"><Select value={f.payment_terms} onChange={(v) => set('payment_terms')(Number(v))} options={PAYMENT_TERMS} /></FormRow>
                 {type === 'customer' && <FormRow label="Credit limit" hint="Shown as a warning on new sales orders and invoices."><Input type="number" min="0" step="0.01" value={f.credit_limit} onChange={set('credit_limit')} /></FormRow>}
                 <FormRow label="Price list"><Select value={f.price_list_id || ''} onChange={set('price_list_id')} options={pls.map((p) => [p.id, p.name])} placeholder="None" /></FormRow>

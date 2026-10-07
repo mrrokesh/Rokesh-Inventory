@@ -11,6 +11,7 @@ import { str, num, id, date, today, listParams } from '../lib/validate.js';
 import { loadItems } from '../lib/stock.js';
 import { cfInput, parseCustomFields } from '../lib/customFields.js';
 import { parseTags } from '../lib/reportingTags.js';
+import { resolveCurrency } from '../lib/currency.js';
 
 export function createDocRouter(cfg) {
   const r = Router();
@@ -86,6 +87,8 @@ export function createDocRouter(cfg) {
       ...(cfg.header ? cfg.header(b, contact, existing) : {}),
       custom_fields: await parseCustomFields(client, req.orgId, cfg.entity, cfInput(b), existing?.custom_fields),
       tags: await parseTags(client, req.orgId, cfg.entity, b.tags, existing?.tags),
+      // Transactions are in the contact's currency; exchange_rate converts to the base currency.
+      ...(await resolveCurrency(client, req.orgId, contact.currency, b.exchange_rate, existing)),
     };
     const lines = parseLines(b.lines, { allowNoItem: cfg.allowNoItem !== false, extra: cfg.lineExtra || [] });
     const items = await loadItems(client, req.orgId, lines.map((l) => l.item_id));

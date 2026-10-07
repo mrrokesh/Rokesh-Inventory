@@ -5,6 +5,7 @@ import { audit } from '../lib/audit.js';
 import { badRequest, conflict, notFound } from '../lib/errors.js';
 import { str, num, int, id, bool, email, obj, oneOf, listParams } from '../lib/validate.js';
 import { cfInput, parseCustomFields } from '../lib/customFields.js';
+import { assertCurrencyAllowed } from '../lib/currency.js';
 
 /** Never send portal credentials to the browser. */
 const safe = ({ portal_password_hash: _h, portal_token: _t, ...rest }: any) => rest;
@@ -92,7 +93,7 @@ export function contactsRouter(type) {
       gst_treatment: gstTreatment,
       gstin: gstin ? gstin.toUpperCase() : null,
       place_of_supply: str(b.place_of_supply, { field: 'Place of supply', max: 60 }),
-      currency: (str(b.currency, { field: 'Currency', max: 3 }) || 'INR').toUpperCase(),
+      currency: await assertCurrencyAllowed({ query }, req.orgId, str(b.currency, { field: 'Currency', max: 3 })),
       payment_terms: int(b.payment_terms, { field: 'Payment terms', min: 0, max: 365, def: 0 }),
       credit_limit: num(b.credit_limit, { field: 'Credit limit', min: 0 }),
       price_list_id: priceListId,
@@ -132,8 +133,17 @@ export function contactsRouter(type) {
   });
 
   r.put('/:id', can(M, 'edit'), async (req, res) => {
-    const { rows: [current] } = await query('SELECT custom_fields FROM contacts WHERE org_id = $1 AND id = $2', [req.orgId, Number(req.params.id)]);
+    const { rows: [current] } = await query('SELECT custom_fields, currency FROM contacts WHERE org_id = $1 AND id = $2', [req.orgId, Number(req.params.id)]);
     const v = await parse(req.body || {}, req, current);
+    if (current && v.currency !== current.currency) {
+      // Changing currency would mix currencies on one contact's invoices, payments and credits.
+      const { rows: used } = await query(
+        `SELECT 1 FROM (SELECT contact_id FROM invoices UNION ALL SELECT contact_id FROM bills UNION ALL SELECT contact_id FROM sales_orders
+           UNION ALL SELECT contact_id FROM purchase_orders UNION ALL SELECT contact_id FROM estimates UNION ALL SELECT contact_id FROM credit_notes
+           UNION ALL SELECT contact_id FROM vendor_credits UNION ALL SELECT contact_id FROM payments_received UNION ALL SELECT contact_id FROM payments_made) x
+          WHERE contact_id = $1 LIMIT 1`, [Number(req.params.id)]);
+      if (used.length) throw conflict(`The currency can't be changed because ${current.currency} transactions exist for this contact. Create a new contact for ${v.currency}.`);
+    }
     const updated = await tx(async (client) => {
       const keys = Object.keys(v);
       const { rows } = await client.query(

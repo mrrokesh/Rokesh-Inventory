@@ -68,28 +68,28 @@ r.get('/', async (req, res) => {
          FROM items i LEFT JOIN (SELECT item_id, SUM(on_hand) AS on_hand, SUM(on_hand - committed) AS avail FROM stock_levels WHERE org_id = $1 GROUP BY item_id) s
            ON s.item_id = i.id
         WHERE i.org_id = $1`),
-    q(`SELECT i.id, i.name, i.sku, i.unit, i.image_path, SUM(l.quantity) AS quantity, SUM(l.amount) AS amount
+    q(`SELECT i.id, i.name, i.sku, i.unit, i.image_path, SUM(l.quantity) AS quantity, SUM(l.amount * d.exchange_rate) AS amount
          FROM invoice_lines l JOIN invoices d ON d.id = l.doc_id JOIN items i ON i.id = l.item_id
         WHERE d.org_id = $1 AND d.status NOT IN ('draft','void') AND d.doc_date BETWEEN $2 AND $3
         GROUP BY i.id ORDER BY SUM(l.quantity) DESC LIMIT 5`, [org, from, to]),
     q(`SELECT i.id, i.name, i.sku, i.unit, SUM(sl.qty_remaining) AS quantity, SUM(sl.qty_remaining * sl.unit_cost) AS value
          FROM stock_lots sl JOIN items i ON i.id = sl.item_id WHERE sl.org_id = $1 AND sl.qty_remaining > 0
         GROUP BY i.id ORDER BY SUM(sl.qty_remaining * sl.unit_cost) DESC LIMIT 5`),
-    q(`SELECT to_char(date_trunc('month', doc_date), 'YYYY-MM') AS month, SUM(total) AS total, COUNT(*)::int AS orders
+    q(`SELECT to_char(date_trunc('month', doc_date), 'YYYY-MM') AS month, SUM(total * exchange_rate) AS total, COUNT(*)::int AS orders
          FROM sales_orders WHERE org_id = $1 AND status IN ('confirmed','closed') AND doc_date BETWEEN $2 AND $3
         GROUP BY 1 ORDER BY 1`, [org, from, to]),
-    q(`SELECT COALESCE(SUM(l.quantity),0) AS quantity_ordered, COALESCE(SUM(l.amount),0) AS total_cost,
+    q(`SELECT COALESCE(SUM(l.quantity),0) AS quantity_ordered, COALESCE(SUM(l.amount * d.exchange_rate),0) AS total_cost,
               COUNT(DISTINCT d.id)::int AS orders
          FROM purchase_orders d JOIN purchase_order_lines l ON l.doc_id = d.id
         WHERE d.org_id = $1 AND d.status IN ('issued','closed') AND d.doc_date BETWEEN $2 AND $3`, [org, from, to]),
     q(`SELECT
-        (SELECT COALESCE(SUM(balance),0) FROM invoices WHERE org_id = $1 AND status IN ('sent','partially_paid')) AS receivables,
-        (SELECT COALESCE(SUM(balance),0) FROM invoices WHERE org_id = $1 AND status IN ('sent','partially_paid') AND due_date < CURRENT_DATE) AS receivables_overdue,
-        (SELECT COALESCE(SUM(balance),0) FROM bills WHERE org_id = $1 AND status IN ('open','partially_paid')) AS payables,
-        (SELECT COALESCE(SUM(balance),0) FROM bills WHERE org_id = $1 AND status IN ('open','partially_paid') AND due_date < CURRENT_DATE) AS payables_overdue,
-        (SELECT COALESCE(SUM(amount),0) FROM payments_received WHERE org_id = $1 AND payment_date BETWEEN $2 AND $3) AS received_in_period,
-        (SELECT COALESCE(SUM(amount),0) FROM payments_made WHERE org_id = $1 AND payment_date BETWEEN $2 AND $3) AS paid_in_period,
-        (SELECT COALESCE(SUM(total),0) FROM invoices WHERE org_id = $1 AND status NOT IN ('draft','void') AND doc_date BETWEEN $2 AND $3) AS invoiced_in_period`,
+        (SELECT COALESCE(SUM(balance * exchange_rate),0) FROM invoices WHERE org_id = $1 AND status IN ('sent','partially_paid')) AS receivables,
+        (SELECT COALESCE(SUM(balance * exchange_rate),0) FROM invoices WHERE org_id = $1 AND status IN ('sent','partially_paid') AND due_date < CURRENT_DATE) AS receivables_overdue,
+        (SELECT COALESCE(SUM(balance * exchange_rate),0) FROM bills WHERE org_id = $1 AND status IN ('open','partially_paid')) AS payables,
+        (SELECT COALESCE(SUM(balance * exchange_rate),0) FROM bills WHERE org_id = $1 AND status IN ('open','partially_paid') AND due_date < CURRENT_DATE) AS payables_overdue,
+        (SELECT COALESCE(SUM(amount * exchange_rate),0) FROM payments_received WHERE org_id = $1 AND payment_date BETWEEN $2 AND $3) AS received_in_period,
+        (SELECT COALESCE(SUM(amount * exchange_rate),0) FROM payments_made WHERE org_id = $1 AND payment_date BETWEEN $2 AND $3) AS paid_in_period,
+        (SELECT COALESCE(SUM(total * exchange_rate),0) FROM invoices WHERE org_id = $1 AND status NOT IN ('draft','void') AND doc_date BETWEEN $2 AND $3) AS invoiced_in_period`,
       [org, from, to]),
     q(`SELECT a.id, a.action, a.entity_type, a.entity_id, a.summary, a.created_at, u.name AS user_name
          FROM audit_logs a LEFT JOIN users u ON u.id = a.user_id WHERE a.org_id = $1 ORDER BY a.created_at DESC LIMIT 10`),
@@ -112,15 +112,15 @@ r.get('/', async (req, res) => {
         EXISTS (SELECT 1 FROM payments_received WHERE org_id = $1) AS has_payment,
         EXISTS (SELECT 1 FROM taxes WHERE org_id = $1) AS has_tax,
         (SELECT logo_path IS NOT NULL OR (address->>'street1') IS NOT NULL FROM organizations WHERE id = $1) AS has_profile`),
-    q(`SELECT c.id, c.display_name, SUM(d.total) AS total, COUNT(*)::int AS orders FROM purchase_orders d JOIN contacts c ON c.id = d.contact_id
+    q(`SELECT c.id, c.display_name, SUM(d.total * d.exchange_rate) AS total, COUNT(*)::int AS orders FROM purchase_orders d JOIN contacts c ON c.id = d.contact_id
         WHERE d.org_id = $1 AND d.status IN ('issued','closed') AND d.doc_date BETWEEN $2 AND $3
-        GROUP BY c.id ORDER BY SUM(d.total) DESC LIMIT 5`, [org, from, to]),
+        GROUP BY c.id ORDER BY SUM(d.total * d.exchange_rate) DESC LIMIT 5`, [org, from, to]),
     q(`SELECT
         COUNT(*) FILTER (WHERE status = 'draft')::int AS draft,
         COUNT(*) FILTER (WHERE status = 'confirmed')::int AS confirmed,
         COUNT(*) FILTER (WHERE status = 'closed')::int AS closed,
         COUNT(*) FILTER (WHERE status = 'void')::int AS void,
-        COALESCE(SUM(total) FILTER (WHERE status IN ('confirmed','closed')),0) AS total
+        COALESCE(SUM(total * exchange_rate) FILTER (WHERE status IN ('confirmed','closed')),0) AS total
          FROM sales_orders WHERE org_id = $1 AND doc_date BETWEEN $2 AND $3`, [org, from, to]),
   ]);
 
@@ -132,22 +132,22 @@ r.get('/', async (req, res) => {
         WHERE i.org_id = $1 AND i.track_inventory AND i.status = 'active' AND i.reorder_level > 0 AND COALESCE(s.available,0) <= i.reorder_level
         ORDER BY COALESCE(s.available,0) - i.reorder_level LIMIT 8`),
     q(`SELECT
-        COALESCE(SUM(balance) FILTER (WHERE due_date >= CURRENT_DATE),0) AS current,
-        COALESCE(SUM(balance) FILTER (WHERE CURRENT_DATE - due_date BETWEEN 1 AND 15),0) AS d1_15,
-        COALESCE(SUM(balance) FILTER (WHERE CURRENT_DATE - due_date BETWEEN 16 AND 30),0) AS d16_30,
-        COALESCE(SUM(balance) FILTER (WHERE CURRENT_DATE - due_date BETWEEN 31 AND 45),0) AS d31_45,
-        COALESCE(SUM(balance) FILTER (WHERE CURRENT_DATE - due_date > 45),0) AS d45_plus
+        COALESCE(SUM(balance * exchange_rate) FILTER (WHERE due_date >= CURRENT_DATE),0) AS current,
+        COALESCE(SUM(balance * exchange_rate) FILTER (WHERE CURRENT_DATE - due_date BETWEEN 1 AND 15),0) AS d1_15,
+        COALESCE(SUM(balance * exchange_rate) FILTER (WHERE CURRENT_DATE - due_date BETWEEN 16 AND 30),0) AS d16_30,
+        COALESCE(SUM(balance * exchange_rate) FILTER (WHERE CURRENT_DATE - due_date BETWEEN 31 AND 45),0) AS d31_45,
+        COALESCE(SUM(balance * exchange_rate) FILTER (WHERE CURRENT_DATE - due_date > 45),0) AS d45_plus
          FROM invoices WHERE org_id = $1 AND status IN ('sent','partially_paid')`),
     q(`SELECT s.id, s.number, s.status, s.carrier, s.tracking_number, s.ship_date, s.estimated_delivery, c.display_name AS contact_name
          FROM shipments s JOIN contacts c ON c.id = s.contact_id
         WHERE s.org_id = $1 AND s.status IN ('shipped','in_transit')
         ORDER BY s.estimated_delivery NULLS LAST, s.ship_date LIMIT 6`),
     q(`SELECT
-        (SELECT COALESCE(SUM(total),0) FROM invoices WHERE org_id = $1 AND status NOT IN ('draft','void') AND doc_date = CURRENT_DATE) AS invoiced,
+        (SELECT COALESCE(SUM(total * exchange_rate),0) FROM invoices WHERE org_id = $1 AND status NOT IN ('draft','void') AND doc_date = CURRENT_DATE) AS invoiced,
         (SELECT COUNT(*) FROM sales_orders WHERE org_id = $1 AND doc_date = CURRENT_DATE)::int AS sales_orders,
-        (SELECT COALESCE(SUM(amount),0) FROM payments_received WHERE org_id = $1 AND payment_date = CURRENT_DATE) AS received,
+        (SELECT COALESCE(SUM(amount * exchange_rate),0) FROM payments_received WHERE org_id = $1 AND payment_date = CURRENT_DATE) AS received,
         (SELECT COUNT(*) FROM shipments WHERE org_id = $1 AND ship_date = CURRENT_DATE)::int AS shipped`),
-    q(`SELECT COALESCE(so.channel, 'direct') AS channel, SUM(d.total) AS total, COUNT(*)::int AS invoices
+    q(`SELECT COALESCE(so.channel, 'direct') AS channel, SUM(d.total * d.exchange_rate) AS total, COUNT(*)::int AS invoices
          FROM invoices d LEFT JOIN sales_orders so ON so.id = d.sales_order_id
         WHERE d.org_id = $1 AND d.status IN ('sent','partially_paid','paid') AND d.doc_date BETWEEN $2 AND $3
         GROUP BY 1 ORDER BY 2 DESC`, [org, from, to]),

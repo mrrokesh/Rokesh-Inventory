@@ -23,6 +23,21 @@ Under **Settings → Organization profile → Inventory preferences**:
 - **Inventory start date**: stock can't be recorded with an earlier date. Set it once your opening stock is in, so nobody accidentally back-dates a bill or adjustment and changes your opening figures. Leave it empty for no limit.
 - **Item names**: tick *Allow more than one item with the same name* if you really need it (for example the same product from two brands). Otherwise the app stops you from creating a second "Office Chair". SKUs must always be different.
 
+## Foreign currencies (customers and vendors abroad)
+
+1. **Settings → Currencies → + New currency**: pick the currency (e.g. USD) and enter today's rate, *1 USD = 83.25 INR*.
+2. On the customer or vendor, set **Currency** to it (on the *Other details* tab).
+3. Their estimates, orders, invoices, bills, credit notes and payments are now in that currency. Each document shows an **Exchange rate** box, pre-filled with the saved rate. Change it if the rate on the day is different.
+
+What happens behind the scenes:
+- Item prices (kept in rupees) are converted into the customer's currency when you add the item.
+- **Stock cost** of goods bought in a foreign currency is converted to rupees with the rate on the bill or purchase order.
+- **Reports and the dashboard** always show rupees. Each document is converted at its own rate.
+- A payment is in the same currency as the contact's invoices or bills, with the rate you actually got.
+- Once a contact has transactions, their currency can't be changed, so their invoices and payments never mix currencies. For a different currency, create a separate contact.
+
+Update the rates in **Settings → Currencies** whenever you like. Old documents keep the rate they were made with.
+
 ## Taxes
 
 Add every tax rate you charge, e.g. GST5, GST12, GST18, GST28. Then pick the right tax on each item; orders and invoices calculate tax automatically.

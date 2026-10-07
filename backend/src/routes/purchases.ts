@@ -160,7 +160,7 @@ purchaseReceives.post('/', can('purchase_receives', 'create'), async (req, res) 
       await client.query('UPDATE purchase_order_lines SET qty_received = qty_received + $2 WHERE id = $1', [pol.id, qty]);
       if (pol.track_inventory) {
         await stockIn(client, ctxOf(req), {
-          itemId: pol.item_id, warehouseId: whId, qty, unitCost: effectiveRate(pol, po.discount_percent), date: receiveDate, tracking,
+          itemId: pol.item_id, warehouseId: whId, qty, unitCost: effectiveRate(pol, po.discount_percent) * (Number(po.exchange_rate) || 1), date: receiveDate, tracking,
           sourceType: 'purchase_receive', sourceId: rcv.id, sourceNumber: number, note: `Received from ${po.contact_name} (${po.number})`,
         });
       }
@@ -246,7 +246,7 @@ bills.post('/:id/open', can('bills', 'approve'), async (req, res) => {
       for (const l of bill.lines) {
         if (l.item_id && l.track_inventory) {
           await stockIn(client, ctxOf(req), {
-            itemId: l.item_id, warehouseId: bill.warehouse_id, qty: l.quantity, unitCost: effectiveRate(l, bill.discount_percent), date: bill.doc_date, tracking: l.tracking,
+            itemId: l.item_id, warehouseId: bill.warehouse_id, qty: l.quantity, unitCost: effectiveRate(l, bill.discount_percent) * (Number(bill.exchange_rate) || 1), date: bill.doc_date, tracking: l.tracking,
             sourceType: 'bill', sourceId: bill.id, sourceNumber: bill.number, note: `Billed by ${bill.contact_name}`,
           });
         }

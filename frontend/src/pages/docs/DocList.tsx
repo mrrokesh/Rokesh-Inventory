@@ -37,8 +37,8 @@ export default function DocList({ cfg }: any) {
     { key: 'status', label: 'Status', sort: 'status', render: (r) => <Badge status={r.display_status || r.status} />, csv: (r) => r.display_status || r.status },
     ...(cfg.hasBalance ? [{ key: 'due_date', label: 'Due date', sort: 'due', render: (r) => date(r.due_date) }] : []),
     ...extra,
-    { key: 'total', label: 'Amount', num: true, sort: 'total', render: (r) => money(r.total) },
-    ...(cfg.hasBalance || cfg.hasCredit ? [{ key: 'balance', label: cfg.hasCredit ? 'Balance' : 'Balance due', num: true, sort: cfg.hasBalance ? 'balance' : undefined, render: (r) => money(r.balance) }] : []),
+    { key: 'total', label: 'Amount', num: true, sort: 'total', render: (r) => money(r.total, { currency: r.currency }) },
+    ...(cfg.hasBalance || cfg.hasCredit ? [{ key: 'balance', label: cfg.hasCredit ? 'Balance' : 'Balance due', num: true, sort: cfg.hasBalance ? 'balance' : undefined, render: (r) => money(r.balance, { currency: r.currency }) }] : []),
   ];
   return (
     <div className="page">

@@ -3,6 +3,7 @@ import { query, tx } from '../db.js';
 import { can } from '../middleware/auth.js';
 import { audit } from '../lib/audit.js';
 import { badRequest, notFound } from '../lib/errors.js';
+import { resolveCurrency } from '../lib/currency.js';
 import { str, num, id, date, oneOf, today, listParams, round2 } from '../lib/validate.js';
 import { peekNumber, takeNumber } from '../lib/numbering.js';
 import { getContact, refreshPayable } from '../lib/documents.js';
@@ -73,6 +74,8 @@ export function paymentsRouter(kind) {
       if (!doc || doc.contact_id !== contactId) throw badRequest(`${cfg.docKind === 'invoice' ? 'Invoice' : 'Bill'} not found for this ${cfg.contactType}`);
       if (!cfg.openStatuses.includes(doc.status)) throw badRequest(`${doc.number} is not open for payment`);
       if (value > doc.balance + 0.004) throw badRequest(`Amount applied to ${doc.number} exceeds its balance (${doc.balance})`);
+      const { rows: [pay] } = await client.query(`SELECT currency FROM ${cfg.table} WHERE id = $1`, [paymentId]);
+      if ((doc.currency || pay.currency) !== pay.currency) throw badRequest(`${doc.number} is in ${doc.currency}; record a ${doc.currency} payment for it`);
       await client.query(`INSERT INTO ${cfg.alloc} (payment_id, ${cfg.docCol}, amount) VALUES ($1, $2, $3)`, [paymentId, docId, value]);
       await refreshPayable(client, cfg.docKind, docId);
       touched.add(docId);
@@ -98,9 +101,10 @@ export function paymentsRouter(kind) {
 
   r.post('/', can(M, 'create'), async (req, res) => {
     const b = req.body || {};
-    const v = parse(b);
+    const v: any = parse(b);
     const result = await tx(async (client) => {
-      await getContact(client, req.orgId, v.contact_id, cfg.contactType);
+      const contact = await getContact(client, req.orgId, v.contact_id, cfg.contactType);
+      Object.assign(v, await resolveCurrency(client, req.orgId, contact.currency, b.exchange_rate));
       const number = await takeNumber(client, req.orgId, cfg.numberType, b.number);
       const keys = Object.keys(v);
       const { rows: [pay] } = await client.query(
@@ -116,10 +120,12 @@ export function paymentsRouter(kind) {
 
   r.put('/:id', can(M, 'edit'), async (req, res) => {
     const b = req.body || {};
-    const v = parse(b);
+    const v: any = parse(b);
     const result = await tx(async (client) => {
       const cur = await fetchPayment(client, req.orgId, Number(req.params.id), true);
       if (v.contact_id !== cur.contact_id) throw badRequest(`The ${cfg.contactType} of a payment cannot be changed`);
+      const contact = await getContact(client, req.orgId, v.contact_id, cfg.contactType);
+      Object.assign(v, await resolveCurrency(client, req.orgId, contact.currency, b.exchange_rate, cur));
       await client.query(`DELETE FROM ${cfg.alloc} WHERE payment_id = $1`, [cur.id]);
       for (const a of cur.allocations) await refreshPayable(client, cfg.docKind, a.doc_id);
       const keys = Object.keys(v);

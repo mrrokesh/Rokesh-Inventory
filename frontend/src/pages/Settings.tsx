@@ -8,7 +8,7 @@ import DataTable from '../components/DataTable';
 import { Badge, Checkbox, ErrorBox, Field, FormRow, Input, Modal, PageHead, Select, Spinner, Textarea, confirmDialog, useAction, useApi } from '../components/ui';
 import { useToast } from '../components/Toast';
 import { Developer, EmailSettings, Integrations } from './SettingsExtra';
-import { BrandingSettings, CustomFieldsSettings, ReportingTagsSettings, TemplatesSettings } from './SettingsCustom';
+import { BrandingSettings, CurrenciesSettings, CustomFieldsSettings, ReportingTagsSettings, TemplatesSettings } from './SettingsCustom';
 import WorkflowSettings from './Workflows';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -451,7 +451,7 @@ function AuditLog() {
 
 // ------------------------------------------------------------------ shell
 const LINKS = [
-  ['organization', 'Organization profile'], ['branding', 'Branding'], ['warehouses', 'Warehouses'], ['taxes', 'Taxes'], ['units', 'Units'], ['numbering', 'Number series'], ['custom-fields', 'Custom fields'], ['reporting-tags', 'Reporting tags'], ['templates', 'PDF templates'], ['workflows', 'Workflow rules'],
+  ['organization', 'Organization profile'], ['branding', 'Branding'], ['warehouses', 'Warehouses'], ['taxes', 'Taxes'], ['currencies', 'Currencies'], ['units', 'Units'], ['numbering', 'Number series'], ['custom-fields', 'Custom fields'], ['reporting-tags', 'Reporting tags'], ['templates', 'PDF templates'], ['workflows', 'Workflow rules'],
   ['carriers', 'Shipping carriers'], ['email', 'Email'], ['announcements', 'Announcements'], ['integrations', 'Integrations'],
   ['developer', 'API keys & webhooks', 'users'], ['users', 'Users', 'users'], ['roles', 'Roles & permissions', 'users'], ['audit', 'Audit log', 'reports'],
 ];
@@ -546,6 +546,7 @@ export default function Settings() {
             <Route path="workflows" element={<WorkflowSettings />} />
             <Route path="warehouses" element={<Warehouses />} />
             <Route path="taxes" element={<Taxes />} />
+            <Route path="currencies" element={<CurrenciesSettings />} />
             <Route path="units" element={<Units />} />
             <Route path="numbering" element={<Numbering />} />
             <Route path="carriers" element={<Carriers />} />

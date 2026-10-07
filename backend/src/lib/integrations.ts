@@ -73,7 +73,7 @@ export async function razorpayTest(orgId) {
 export async function ensurePaymentLink(orgId, invoiceId) {
   const it = await requireIntegration(orgId, 'razorpay');
   const { rows: [inv] } = await query(
-    `SELECT i.*, c.display_name, c.email, c.mobile, c.phone, o.currency, o.name AS org_name, o.portal_slug
+    `SELECT i.*, c.display_name, c.email, c.mobile, c.phone, o.currency AS org_currency, o.name AS org_name, o.portal_slug
        FROM invoices i JOIN contacts c ON c.id = i.contact_id JOIN organizations o ON o.id = i.org_id WHERE i.org_id = $1 AND i.id = $2`,
     [orgId, invoiceId],
   );
@@ -90,7 +90,7 @@ export async function ensurePaymentLink(orgId, invoiceId) {
   const { data } = await http('https://api.razorpay.com/v1/payment_links', {
     method: 'POST', headers: razorpayAuth(it),
     body: {
-      amount: Math.round(Number(inv.balance) * 100), currency: inv.currency || 'INR', accept_partial: false,
+      amount: Math.round(Number(inv.balance) * 100), currency: inv.currency || inv.org_currency || 'INR', accept_partial: false,
       reference_id: `${inv.number}-${Date.now().toString(36)}`.slice(0, 40),
       description: `Invoice ${inv.number} from ${inv.org_name}`.slice(0, 2048),
       customer: { name: inv.display_name, ...(inv.email ? { email: inv.email } : {}), ...(phone ? { contact: phone } : {}) },

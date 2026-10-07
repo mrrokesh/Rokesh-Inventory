@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, mediaUrl } from '../../api';
 import { useAuth } from '../../auth';
 import { useLookups } from '../../lib/lookups';
-import { addressLines, date, label, modeLabel, money, qty, PAYMENT_TERMS } from '../../lib/format';
+import { addressLines, baseCurrency, date, label, modeLabel, money, qty, PAYMENT_TERMS } from '../../lib/format';
 import { Badge, Dropdown, ErrorBox, PageHead, Spinner, confirmDialog, useAction, useApi } from '../../components/ui';
 import { Attachments, History } from '../../components/Attachments';
 import { useToast } from '../../components/Toast';
@@ -30,6 +30,7 @@ export function DocPaper({ cfg, doc, org, template = null, preview = false }: an
   const { templates } = useLookups('templates');
   const t = { ...TEMPLATE_DEFAULTS, ...(template || templates?.[cfg.entity] || {}) };
   const accent = t.accent_color || org?.brand_color || '';
+  const dm = (v, o: any = {}) => money(v, { ...o, currency: doc.currency });
   const terms = PAYMENT_TERMS.find((p) => p[0] === doc.payment_terms)?.[1];
   // GST: same state as the organization → CGST + SGST; another state → IGST.
   const gstMode = org?.gst_registered && org?.state;
@@ -63,8 +64,8 @@ export function DocPaper({ cfg, doc, org, template = null, preview = false }: an
           <div className="doc-title">{t.title || cfg.printTitle}</div>
           <div className="bold"># {doc.number}</div>
           {cfg.hasBalance && doc.status !== 'draft' && <div className="mt small muted">Balance due</div>}
-          {cfg.hasBalance && doc.status !== 'draft' && <div className="bold" style={{ fontSize: 18 }}>{money(doc.balance)}</div>}
-          {cfg.hasCredit && doc.status !== 'draft' && <><div className="mt small muted">Credits remaining</div><div className="bold" style={{ fontSize: 18 }}>{money(doc.balance)}</div></>}
+          {cfg.hasBalance && doc.status !== 'draft' && <div className="bold" style={{ fontSize: 18 }}>{dm(doc.balance)}</div>}
+          {cfg.hasCredit && doc.status !== 'draft' && <><div className="mt small muted">Credits remaining</div><div className="bold" style={{ fontSize: 18 }}>{dm(doc.balance)}</div></>}
         </div>
       </div>
       {t.header_note && <div className="doc-note mt" style={{ whiteSpace: 'pre-wrap' }}>{t.header_note}</div>}
@@ -105,6 +106,7 @@ export function DocPaper({ cfg, doc, org, template = null, preview = false }: an
           {cfg.key === 'vendor_credits' && <><dt>Goods returned</dt><dd>{doc.return_stock ? 'Yes' : 'No'}</dd></>}
           {t.show_custom_fields && <CustomFieldValues entity={cfg.entity} values={doc.custom_fields} pdf />}
           {!preview && <TagValues module={cfg.entity} values={doc.tags} />}
+          {doc.currency && doc.currency !== baseCurrency() && <><dt>Currency</dt><dd>{doc.currency} <span className="small faint">(1 {doc.currency} = {Number(doc.exchange_rate)} {baseCurrency()})</span></dd></>}
         </dl>
       </div>
       <table className="table mt" style={{ marginTop: 24 }}>
@@ -124,10 +126,10 @@ export function DocPaper({ cfg, doc, org, template = null, preview = false }: an
               {cfg.key === 'sales_orders' && <><td className="num">{qty(l.qty_packed)}</td><td className="num">{qty(l.qty_shipped)}</td><td className="num">{qty(l.qty_invoiced)}</td></>}
               {cfg.key === 'purchase_orders' && <><td className="num">{qty(l.qty_received)}</td><td className="num">{qty(l.qty_billed)}</td></>}
               <td className="num">{qty(l.quantity)} {t.show_unit ? l.item_unit || '' : ''}</td>
-              <td className="num">{money(l.rate, { symbol: false })}</td>
+              <td className="num">{dm(l.rate, { symbol: false })}</td>
               {showDisc && <td className="num">{Number(l.discount_percent) ? `${Number(l.discount_percent)}%` : '—'}</td>}
               {t.show_tax_column && <td className="num">{Number(l.tax_rate) ? `${Number(l.tax_rate)}%` : '—'}</td>}
-              <td className="num">{money(l.amount, { symbol: false })}</td>
+              <td className="num">{dm(l.amount, { symbol: false })}</td>
             </tr>
           ))}
         </tbody>
@@ -139,15 +141,16 @@ export function DocPaper({ cfg, doc, org, template = null, preview = false }: an
           {t.bank_details && <><div className="small muted">Bank details</div><div style={{ whiteSpace: 'pre-wrap' }}>{t.bank_details}</div></>}
         </div>
         <div className="totals" style={{ background: 'none' }}>
-          <div className="t-row"><span>Sub total</span><span>{money(doc.sub_total)}</span></div>
-          {doc.discount_total > 0 && <div className="t-row"><span>Discount ({Number(doc.discount_percent)}%)</span><span>-{money(doc.discount_total)}</span></div>}
-          {[...taxBreak.entries()].map(([k, v]) => <div className="t-row" key={k}><span>{k}</span><span>{money(v)}</span></div>)}
-          {doc.shipping_charge > 0 && <div className="t-row"><span>Shipping charges</span><span>{money(doc.shipping_charge)}</span></div>}
-          {doc.adjustment !== 0 && <div className="t-row"><span>Adjustment</span><span>{money(doc.adjustment)}</span></div>}
-          <div className="t-row grand"><span>Total</span><span>{money(doc.total)}</span></div>
-          {cfg.hasBalance && doc.amount_paid > 0 && <div className="t-row"><span>Payments made</span><span>(-) {money(doc.amount_paid)}</span></div>}
-          {cfg.hasBalance && doc.credits_applied > 0 && <div className="t-row"><span>Credits applied</span><span>(-) {money(doc.credits_applied)}</span></div>}
-          {cfg.hasBalance && doc.status !== 'draft' && <div className="t-row bold"><span>Balance due</span><span>{money(doc.balance)}</span></div>}
+          <div className="t-row"><span>Sub total</span><span>{dm(doc.sub_total)}</span></div>
+          {doc.discount_total > 0 && <div className="t-row"><span>Discount ({Number(doc.discount_percent)}%)</span><span>-{dm(doc.discount_total)}</span></div>}
+          {[...taxBreak.entries()].map(([k, v]) => <div className="t-row" key={k}><span>{k}</span><span>{dm(v)}</span></div>)}
+          {doc.shipping_charge > 0 && <div className="t-row"><span>Shipping charges</span><span>{dm(doc.shipping_charge)}</span></div>}
+          {doc.adjustment !== 0 && <div className="t-row"><span>Adjustment</span><span>{dm(doc.adjustment)}</span></div>}
+          <div className="t-row grand"><span>Total</span><span>{dm(doc.total)}</span></div>
+          {doc.currency && doc.currency !== baseCurrency() && <div className="t-row small faint"><span>Total in {baseCurrency()}</span><span>{money(Number(doc.total) * Number(doc.exchange_rate))}</span></div>}
+          {cfg.hasBalance && doc.amount_paid > 0 && <div className="t-row"><span>Payments made</span><span>(-) {dm(doc.amount_paid)}</span></div>}
+          {cfg.hasBalance && doc.credits_applied > 0 && <div className="t-row"><span>Credits applied</span><span>(-) {dm(doc.credits_applied)}</span></div>}
+          {cfg.hasBalance && doc.status !== 'draft' && <div className="t-row bold"><span>Balance due</span><span>{dm(doc.balance)}</span></div>}
         </div>
       </div>
       {t.show_signature && (

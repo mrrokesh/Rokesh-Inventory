@@ -2,7 +2,7 @@
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../../api';
 import { useLookups } from '../../lib/lookups';
-import { money, qty, today, PAYMENT_TERMS, INDIAN_STATES } from '../../lib/format';
+import { baseCurrency, money, qty, today, PAYMENT_TERMS, INDIAN_STATES } from '../../lib/format';
 import { TrackingButton, TrackingModal } from '../../components/Tracking';
 import { useAuth } from '../../auth';
 import { ContactPicker, ItemPicker } from '../../components/Pickers';
@@ -33,7 +33,7 @@ export default function DocForm({ cfg }: any) {
     number: '', reference: '', doc_date: today(), warehouse_id: '', discount_percent: 0, shipping_charge: '', adjustment: '', notes: '', terms: '',
     payment_terms: 0, due_date: '', expected_shipment_date: '', expected_delivery_date: '', delivery_method: '', salesperson: '', shipment_preference: '',
     return_stock: false, sales_order_id: null, purchase_order_id: null, invoice_id: null, sales_return_id: null, bill_id: null,
-    delivery_challan_id: null, place_of_supply: '', expiry_date: '', challan_type: 'supply_on_approval', custom_fields: {}, tags: {},
+    delivery_challan_id: null, place_of_supply: '', expiry_date: '', challan_type: 'supply_on_approval', custom_fields: {}, tags: {}, exchange_rate: null,
   });
   const { user } = useAuth();
   const [trackFor, setTrackFor] = useState(null);
@@ -64,7 +64,7 @@ export default function DocForm({ cfg }: any) {
           const d = await api.get(`${cfg.api}/${id}`);
           if (!alive) return;
           if (d.status !== 'draft') { toast(`Only draft ${cfg.one.toLowerCase()}s can be edited`, 'error'); navigate(`${cfg.path}/${id}`, { replace: true }); return; }
-          setContact({ id: d.contact_id, display_name: d.contact_name });
+          setContact({ id: d.contact_id, display_name: d.contact_name, currency: d.currency });
           setH((x) => {
             const v = { ...x };
             for (const k of Object.keys(x)) if (d[k] !== undefined && d[k] !== null) v[k] = d[k];
@@ -124,12 +124,12 @@ export default function DocForm({ cfg }: any) {
           if (sp.get('contact')) await pick(sp.get('contact'));
           if (sp.get('item')) {
             const it = await api.get(`/items/${sp.get('item')}`);
-            setLines([newLine({ item_id: it.id, item_name: it.name, rate: it[priceField], tax_id: it[taxField] || '', track: it.track_inventory, available: it.available_stock, unit: it.unit })]);
+            setLines([newLine({ item_id: it.id, item_name: it.name, rate: toDocPrice(it[priceField]), tax_id: it[taxField] || '', track: it.track_inventory, available: it.available_stock, unit: it.unit })]);
           }
           if (sp.get('items')) {
             const ids = sp.get('items').split(',').filter(Boolean);
             const items = await Promise.all(ids.map((i) => api.get(`/items/${i}`)));
-            setLines(items.map((it) => newLine({ item_id: it.id, item_name: it.name, rate: it[priceField], tax_id: it[taxField] || '', track: it.track_inventory, available: it.available_stock, unit: it.unit, quantity: Math.max(1, Number(it.reorder_level) - Number(it.available_stock)) })));
+            setLines(items.map((it) => newLine({ item_id: it.id, item_name: it.name, rate: toDocPrice(it[priceField]), tax_id: it[taxField] || '', track: it.track_inventory, available: it.available_stock, unit: it.unit, quantity: Math.max(1, Number(it.reorder_level) - Number(it.available_stock)) })));
           }
         }
       } catch (err) {
@@ -175,13 +175,18 @@ export default function DocForm({ cfg }: any) {
     if (!plId || !ids.length) return;
     try {
       const rates = await api.get(`/price-lists/${plId}/rates`, { item_ids: ids.join(',') });
-      setLines((cur) => cur.map((l) => (l.item_id && rates[l.item_id] !== undefined ? { ...l, rate: rates[l.item_id] } : l)));
+      setLines((cur) => cur.map((l) => (l.item_id && rates[l.item_id] !== undefined ? { ...l, rate: toDocPrice(rates[l.item_id]) } : l)));
     } catch { /* price list unavailable: keep base rates */ }
   }
 
+  // Item prices are in the base currency; on a foreign-currency document convert them at the exchange rate.
+  function toDocPrice(v) {
+    const r = Number(rateRef.current);
+    return rateRef.foreign && r > 0 ? Math.round((Number(v) || 0) / r * 100) / 100 : v;
+  }
   const updateLine = (k, patch) => setLines((ls) => ls.map((l) => (l._k === k ? { ...l, ...patch } : l)));
   const selectItem = async (k, it) => {
-    updateLine(k, { item_id: it.id, item_name: it.name, rate: it[priceField], tax_id: it[taxField] || '', track: it.track_inventory, available: it.available_stock, unit: it.unit, tmode: it.tracking || 'none', tracking: null,
+    updateLine(k, { item_id: it.id, item_name: it.name, rate: toDocPrice(it[priceField]), tax_id: it[taxField] || '', track: it.track_inventory, available: it.available_stock, unit: it.unit, tmode: it.tracking || 'none', tracking: null,
       description: (cfg.priceKind === 'sales' ? it.sales_description : it.purchase_description) || '' });
     if (contact?.price_list_id) applyPriceList(contact.price_list_id, [{ item_id: it.id }]);
   };
@@ -202,7 +207,7 @@ export default function DocForm({ cfg }: any) {
         const same = ls.find((l) => l.item_id === it.id && !l.tracking);
         if (same) return ls.map((l) => (l === same ? { ...l, quantity: Number(l.quantity || 0) + 1 } : l));
         added = true;
-        const line = newLine({ item_id: it.id, item_name: it.name, rate: it[priceField], tax_id: it[taxField] || '', track: it.track_inventory, available: it.available_stock, unit: it.unit, tmode: it.tracking || 'none',
+        const line = newLine({ item_id: it.id, item_name: it.name, rate: toDocPrice(it[priceField]), tax_id: it[taxField] || '', track: it.track_inventory, available: it.available_stock, unit: it.unit, tmode: it.tracking || 'none',
           description: (cfg.priceKind === 'sales' ? it.sales_description : it.purchase_description) || '' });
         const blank = ls.findIndex((l) => !l.item_id && !l.description);
         return blank >= 0 ? ls.map((l, i) => (i === blank ? line : l)) : [...ls, line];
@@ -213,6 +218,21 @@ export default function DocForm({ cfg }: any) {
       setScanMsg({ ok: false, text: err.message });
     }
   };
+
+  // Foreign-currency contacts: the document is in their currency, with an exchange rate to the base currency.
+  const docCurrency = (contact?.currency || baseCurrency()).toUpperCase();
+  const foreign = docCurrency !== baseCurrency();
+  const cm = (v, o: any = {}) => money(v, { ...o, currency: docCurrency });
+  const [rate, setRate] = useState('');
+  const rateRef: any = useRef('');
+  rateRef.current = rate;
+  rateRef.foreign = foreign;
+  useEffect(() => {
+    if (!foreign) { setRate(''); return; }
+    if (editing && h.exchange_rate && Number(h.exchange_rate) !== 1) { setRate(String(h.exchange_rate)); return; }
+    api.get('/currencies').then((r) => { const c = r.currencies.find((x) => x.code === docCurrency); setRate(c ? String(Number(c.exchange_rate)) : ''); }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [docCurrency, foreign]);
 
   const totals = useMemo(() => computeTotals(lines, taxes, h), [lines, taxes, h]);
   const creditWarning = cfg.contactType === 'customer' && contact?.credit_limit && (Number(contact.receivables || 0) + totals.total > Number(contact.credit_limit));
@@ -229,6 +249,8 @@ export default function DocForm({ cfg }: any) {
         })),
       };
       if (!cfg.hasBalance) delete body.due_date;
+      if (foreign && !(Number(rate) > 0)) throw new Error(`Enter the exchange rate for ${docCurrency}`);
+      body.exchange_rate = foreign ? Number(rate) : null;
       const saved = editing ? await api.put(`${cfg.api}/${id}`, body) : await api.post(cfg.api, body);
       if (post) {
         try { await api.post(`${cfg.api}/${saved.id}/${cfg.postAction}`); toast(`${cfg.one} ${saved.number} saved`); } catch (err) { toast(`Saved as draft, but: ${err.message}`, 'error'); }
@@ -285,6 +307,11 @@ export default function DocForm({ cfg }: any) {
                 {fd.type === 'checkbox' &&<div style={{ paddingTop: 22 }}><Checkbox checked={h[fd.key]} onChange={set(fd.key)}>{fd.label}</Checkbox></div>}
               </Field>
             ))}
+            {foreign && (
+              <Field label={`Exchange rate (${docCurrency})`} required hint={`How many ${baseCurrency()} is 1 ${docCurrency} worth on this document`}>
+                <div className="row" style={{ gap: 6 }}><span className="small nowrap">1 {docCurrency} =</span><Input type="number" min="0.000001" step="any" value={rate} onChange={setRate} required /><span className="small">{baseCurrency()}</span></div>
+              </Field>
+            )}
             <Field label="Place of supply" hint="Decides CGST + SGST (same state) or IGST (other state)">
               <Select value={h.place_of_supply || ''} onChange={set('place_of_supply')} options={INDIAN_STATES.map((s) => [s, s])} placeholder="Select state" />
             </Field>
@@ -367,12 +394,13 @@ export default function DocForm({ cfg }: any) {
             <div className="small faint">You can attach files after saving.</div>
           </div>
           <div className="totals">
-            <div className="t-row"><span>Sub total</span><span>{money(totals.sub_total)}</span></div>
-            <div className="t-row"><span>Discount %</span><input className="input num" type="number" min="0" max="100" step="0.01" value={h.discount_percent} onChange={(e) => set('discount_percent')(e.target.value)} /><span>-{money(totals.discount_total)}</span></div>
-            {totals.taxBreak.map(([name, v]) => <div className="t-row" key={name}><span>{name}</span><span>{money(v)}</span></div>)}
+            <div className="t-row"><span>Sub total</span><span>{cm(totals.sub_total)}</span></div>
+            <div className="t-row"><span>Discount %</span><input className="input num" type="number" min="0" max="100" step="0.01" value={h.discount_percent} onChange={(e) => set('discount_percent')(e.target.value)} /><span>-{cm(totals.discount_total)}</span></div>
+            {totals.taxBreak.map(([name, v]) => <div className="t-row" key={name}><span>{name}</span><span>{cm(v)}</span></div>)}
             <div className="t-row"><span>Shipping charges</span><input className="input num" type="number" min="0" step="0.01" value={h.shipping_charge} onChange={(e) => set('shipping_charge')(e.target.value)} /></div>
             <div className="t-row"><span>Adjustment</span><input className="input num" type="number" step="0.01" value={h.adjustment} onChange={(e) => set('adjustment')(e.target.value)} /></div>
-            <div className="t-row grand"><span>Total</span><span>{money(totals.total)}</span></div>
+            <div className="t-row grand"><span>Total</span><span>{cm(totals.total)}</span></div>
+            {foreign && Number(rate) > 0 && <div className="t-row small faint"><span>In {baseCurrency()}</span><span>{money(totals.total * Number(rate))}</span></div>}
           </div>
         </div>
         {creditWarning && <div className="warn-box mt">This takes {contact.display_name} over their credit limit of {money(contact.credit_limit)}.</div>}
