@@ -7,12 +7,14 @@ import { useAuth } from '../../auth';
 import { date, money } from '../../lib/format';
 import DataTable from '../../components/DataTable';
 import { Badge, PageHead } from '../../components/ui';
+import { useReportingTags } from '../../components/ReportingTags';
 
 export default function DocList({ cfg }: any) {
   const { can, user } = useAuth();
   const toast = useToast();
   const [busy, run] = useAction(toast);
   const [rk, setRk] = useState(0);
+  const tags = useReportingTags(cfg.entity);
   const shopify = cfg.key === 'sales_orders' && (user.integrations || []).includes('shopify') && can('sales_orders', 'create');
   const syncShopify = async () => { const r = await run(() => api.post('/integrations/shopify/sync', { what: 'orders' })); if (r) { toast(r.message); setRk((x) => x + 1); } };
   const extra = {
@@ -46,7 +48,7 @@ export default function DocList({ cfg }: any) {
       </PageHead>
       <DataTable endpoint={cfg.api} reloadKey={rk} rowLink={(r) => `${cfg.path}/${r.id}`} exportName={cfg.key} columns={columns}
         searchPlaceholder={`Search ${cfg.numberLabel}, reference or ${cfg.contactType}`}
-        filters={[{ key: 'status', label: 'Status', options: cfg.statuses }]}
+        filters={[{ key: 'status', label: 'Status', options: cfg.statuses }, ...tags.map((t) => ({ key: `tag_${t.id}`, label: t.name, options: [['', `All ${t.name}`], ...(t.options || []).map((o) => [o, o])] }))]}
         emptyTitle={`No ${cfg.title.toLowerCase()} yet`}
         emptyAction={can(cfg.perm, 'create') && <Link className="btn primary" to={`${cfg.path}/new`}>+ New {cfg.one.toLowerCase()}</Link>} />
     </div>

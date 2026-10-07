@@ -10,6 +10,7 @@ import { parseLines, loadTaxRates, computeTotals, insertLines, fetchDoc, getCont
 import { str, num, id, date, today, listParams } from '../lib/validate.js';
 import { loadItems } from '../lib/stock.js';
 import { cfInput, parseCustomFields } from '../lib/customFields.js';
+import { parseTags } from '../lib/reportingTags.js';
 
 export function createDocRouter(cfg) {
   const r = Router();
@@ -33,6 +34,11 @@ export function createDocRouter(cfg) {
     if (req.query.from) add('d.doc_date >= ?', req.query.from);
     if (req.query.to) add('d.doc_date <= ?', req.query.to);
     for (const col of cfg.filterCols || []) if (req.query[col]) add(`d.${col} = ?`, Number(req.query[col]));
+    // Reporting tag filters: ?tag_<id>=<option>
+    for (const [k, v] of Object.entries(req.query)) {
+      const m = /^tag_(\d+)$/.exec(k);
+      if (m && v) add(`d.tags->>'${m[1]}' = ?`, String(v));
+    }
     if (p.search) {
       params.push(`%${p.search}%`);
       const n = `$${params.length}`;
@@ -79,6 +85,7 @@ export function createDocRouter(cfg) {
       terms: str(b.terms, { field: 'Terms & Conditions', max: 5000 }),
       ...(cfg.header ? cfg.header(b, contact, existing) : {}),
       custom_fields: await parseCustomFields(client, req.orgId, cfg.entity, cfInput(b), existing?.custom_fields),
+      tags: await parseTags(client, req.orgId, cfg.entity, b.tags, existing?.tags),
     };
     const lines = parseLines(b.lines, { allowNoItem: cfg.allowNoItem !== false, extra: cfg.lineExtra || [] });
     const items = await loadItems(client, req.orgId, lines.map((l) => l.item_id));

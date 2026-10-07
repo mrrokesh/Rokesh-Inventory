@@ -3,7 +3,7 @@ import { query, tx } from '../db.js';
 import { can } from '../middleware/auth.js';
 import { audit } from '../lib/audit.js';
 import { badRequest, conflict, notFound } from '../lib/errors.js';
-import { str, num, int, id, email, obj, oneOf, listParams } from '../lib/validate.js';
+import { str, num, int, id, bool, email, obj, oneOf, listParams } from '../lib/validate.js';
 import { cfInput, parseCustomFields } from '../lib/customFields.js';
 
 /** Never send portal credentials to the browser. */
@@ -73,7 +73,14 @@ export function contactsRouter(type) {
     const last = str(b.last_name, { field: 'Last name', max: 100 });
     const display = str(b.display_name, { field: 'Display name', max: 200 }) || company || [first, last].filter(Boolean).join(' ');
     if (!display) throw badRequest('Display name is required');
+    // MSME / Udyam registration (vendors): payments to MSMEs are due within 45 days under the MSMED Act.
+    const msme = type === 'vendor' && bool(b.msme_registered);
+    const udyam = msme ? (str(b.udyam_number, { field: 'Udyam registration number', max: 30 }) || '').toUpperCase() : null;
+    if (msme && udyam && !/^UDYAM-[A-Z]{2}-\d{2}-\d{7}$/.test(udyam)) throw badRequest('Udyam number must look like UDYAM-TN-02-0012345');
     return {
+      msme_registered: msme,
+      msme_type: msme ? oneOf(b.msme_type, ['micro', 'small', 'medium'], { field: 'MSME type', def: 'micro' }) : null,
+      udyam_number: udyam || null,
       customer_type: oneOf(b.customer_type, ['business', 'individual'], { field: 'Customer type', def: 'business' }),
       salutation: str(b.salutation, { field: 'Salutation', max: 10 }),
       first_name: first, last_name: last, company_name: company, display_name: display,

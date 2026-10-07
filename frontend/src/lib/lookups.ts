@@ -18,9 +18,10 @@ const SOURCES = {
   organization: '/settings/organization',
   templates: '/settings/templates',
   customFields: '/settings/custom-fields?active=true',
+  reportingTags: '/settings/reporting-tags?active=true',
 };
 
-const OBJECT_KEYS = new Set(['organization', 'templates']);
+const OBJECT_KEYS = new Set(['organization', 'templates', 'reportingTags']);
 
 async function load(key) {
   if (!cache[key]) cache[key] = api.get(SOURCES[key]).catch((err) => { delete cache[key]; throw err; });

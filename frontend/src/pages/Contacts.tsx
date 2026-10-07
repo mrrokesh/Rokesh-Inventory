@@ -5,7 +5,7 @@ import { useAuth } from '../auth';
 import { addressLines, date, dateTime, money, PAYMENT_TERMS, INDIAN_STATES, label } from '../lib/format';
 import DataTable from '../components/DataTable';
 import { Attachments, History } from '../components/Attachments';
-import { BackLink, Badge, ErrorBox, Field, FormRow, Input, PageHead, Select, Spinner, Tabs, Textarea, confirmDialog, useAction, useApi } from '../components/ui';
+import { BackLink, Badge, Checkbox, ErrorBox, Field, FormRow, Input, PageHead, Select, Spinner, Tabs, Textarea, confirmDialog, useAction, useApi } from '../components/ui';
 import { useToast } from '../components/Toast';
 import { CustomFieldInputs, CustomFieldValues } from '../components/CustomFields';
 
@@ -96,6 +96,7 @@ export function ContactForm({ type }: any) {
     customer_type: 'business', salutation: '', first_name: '', last_name: '', company_name: '', display_name: '', email: '', phone: '', mobile: '',
     website: '', pan: '', gst_treatment: '', gstin: '', place_of_supply: 'Tamil Nadu', currency: 'INR', payment_terms: 0, credit_limit: '', price_list_id: '',
     billing_address: { ...EMPTY_ADDR }, shipping_address: { ...EMPTY_ADDR }, notes: '', status: 'active', contact_persons: [], custom_fields: {},
+    msme_registered: false, msme_type: 'micro', udyam_number: '',
   });
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -178,6 +179,19 @@ export function ContactForm({ type }: any) {
                 <FormRow label="Price list"><Select value={f.price_list_id || ''} onChange={set('price_list_id')} options={pls.map((p) => [p.id, p.name])} placeholder="None" /></FormRow>
                 <FormRow label="Website"><Input value={f.website} onChange={set('website')} /></FormRow>
                 {editing && <FormRow label="Status"><Select value={f.status} onChange={set('status')} options={[['active', 'Active'], ['inactive', 'Inactive']]} /></FormRow>}
+                {type === 'vendor' && (
+                  <>
+                    <FormRow label="MSME" hint="Micro, small and medium enterprises registered on the Udyam portal must be paid within 45 days of the bill.">
+                      <Checkbox checked={f.msme_registered} onChange={set('msme_registered')}>This vendor is MSME (Udyam) registered</Checkbox>
+                    </FormRow>
+                    {f.msme_registered && (
+                      <>
+                        <FormRow label="MSME type"><Select value={f.msme_type || 'micro'} onChange={set('msme_type')} options={[['micro', 'Micro'], ['small', 'Small'], ['medium', 'Medium']]} /></FormRow>
+                        <FormRow label="Udyam registration no." hint="e.g. UDYAM-TN-02-0012345"><Input value={f.udyam_number || ''} onChange={(v) => set('udyam_number')(v.toUpperCase())} maxLength={30} /></FormRow>
+                      </>
+                    )}
+                  </>
+                )}
                 <CustomFieldInputs entity={type} value={f.custom_fields} onChange={set('custom_fields')} isNew={!editing} />
               </div>
             )}
@@ -349,6 +363,7 @@ export function ContactDetail({ type }: any) {
                 <dt>Payment terms</dt><dd>{PAYMENT_TERMS.find((p) => p[0] === d.payment_terms)?.[1] || `Net ${d.payment_terms}`}</dd>
                 {d.credit_limit && <><dt>Credit limit</dt><dd>{money(d.credit_limit)}</dd></>}
                 {d.price_list_name && <><dt>Price list</dt><dd>{d.price_list_name}</dd></>}
+                {d.msme_registered && <><dt>MSME</dt><dd>{label(d.msme_type)}{d.udyam_number && <span className="mono"> · {d.udyam_number}</span>}<div className="small faint">Pay bills within 45 days</div></dd></>}
                 <CustomFieldValues entity={type} values={d.custom_fields} />
               </dl>
               {d.notes && <div className="mt small" style={{ whiteSpace: 'pre-wrap' }}>{d.notes}</div>}

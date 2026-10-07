@@ -11,6 +11,7 @@ import { imageUpload, removePublic } from '../lib/upload.js';
 import { formatNumber } from '../lib/numbering.js';
 import { CUSTOM_FIELD_ENTITIES, CUSTOM_FIELD_TYPES } from '../lib/customFields.js';
 import { DEFAULT_TEMPLATE, TEMPLATE_DOC_TYPES } from '../lib/templates.js';
+import { TAG_MODULES } from '../lib/reportingTags.js';
 import { emailLink } from './email.js';
 import { appUrl } from '../lib/mailer.js';
 import { assertWithinLimit, orgPlan, usageCounts } from '../lib/plans.js';
@@ -547,6 +548,58 @@ r.put('/templates/:docType', can('settings', 'edit'), async (req, res) => {
   );
   await audit({ query }, req, 'update', 'document_template', null, `Template for ${docType.replace('_', ' ')} updated`);
   res.json(t);
+});
+
+// ------------------------------------------------------------ reporting tags
+r.get('/reporting-tags', async (req, res) => {
+  const { rows } = await query(`SELECT * FROM reporting_tags WHERE org_id = $1 ${req.query.active === 'true' ? 'AND is_active' : ''} ORDER BY position, id`, [req.orgId]);
+  res.json({ tags: rows, modules: TAG_MODULES });
+});
+
+function parseTagDef(b) {
+  const options = [...new Set((Array.isArray(b.options) ? b.options : String(b.options || '').split(/[\n,]+/)).map((o) => String(o).trim()).filter(Boolean))];
+  if (!options.length) throw badRequest('Add at least one option, e.g. North, South');
+  if (options.length > 200) throw badRequest('Up to 200 options');
+  const modules = (Array.isArray(b.modules) ? b.modules : []).filter((m) => TAG_MODULES[m]);
+  if (!modules.length) throw badRequest('Choose where the tag is used');
+  return {
+    name: str(b.name, { field: 'Tag name', required: true, max: 60 }),
+    options: JSON.stringify(options), modules, required: bool(b.required), is_active: bool(b.is_active, true), position: int(b.position, { field: 'Position', def: 0 }),
+  };
+}
+
+r.post('/reporting-tags', can('settings', 'edit'), async (req, res) => {
+  const v = parseTagDef(req.body || {});
+  const keys = Object.keys(v);
+  try {
+    const { rows: [row] } = await query(`INSERT INTO reporting_tags (org_id, ${keys.join(', ')}) VALUES ($1, ${keys.map((_, i) => `$${i + 2}`).join(', ')}) RETURNING *`, [req.orgId, ...keys.map((k) => v[k])]);
+    await audit({ query }, req, 'create', 'reporting_tag', row.id, `Reporting tag “${row.name}” created`);
+    res.status(201).json(row);
+  } catch (err) {
+    if (err.code === '23505') throw conflict('A reporting tag with this name already exists');
+    throw err;
+  }
+});
+
+r.put('/reporting-tags/:id', can('settings', 'edit'), async (req, res) => {
+  const v = parseTagDef(req.body || {});
+  const keys = Object.keys(v);
+  try {
+    const { rows: [row] } = await query(`UPDATE reporting_tags SET ${keys.map((k, i) => `${k} = $${i + 3}`).join(', ')} WHERE org_id = $1 AND id = $2 RETURNING *`, [req.orgId, Number(req.params.id), ...keys.map((k) => v[k])]);
+    if (!row) throw notFound('Reporting tag');
+    await audit({ query }, req, 'update', 'reporting_tag', row.id, `Reporting tag “${row.name}” updated`);
+    res.json(row);
+  } catch (err) {
+    if (err.code === '23505') throw conflict('A reporting tag with this name already exists');
+    throw err;
+  }
+});
+
+r.delete('/reporting-tags/:id', can('settings', 'edit'), async (req, res) => {
+  const { rows: [row] } = await query('DELETE FROM reporting_tags WHERE org_id = $1 AND id = $2 RETURNING name', [req.orgId, Number(req.params.id)]);
+  if (!row) throw notFound('Reporting tag');
+  await audit({ query }, req, 'delete', 'reporting_tag', Number(req.params.id), `Reporting tag “${row.name}” deleted`);
+  res.status(204).end();
 });
 
 export default r;

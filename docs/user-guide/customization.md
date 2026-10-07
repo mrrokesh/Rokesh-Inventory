@@ -75,3 +75,21 @@ Click **Save template**. The change applies to all documents of that type, inclu
 - **Digital signature**: upload a picture of the authorised signature, ideally a PNG with a transparent or white background. It's printed above *Authorised Signatory* on your documents. You can rename that label in each PDF template, or turn the signature block off there.
 
 Your **logo** is set under **Settings → Organization profile**.
+
+## Reporting tags: see results by region, branch or project
+
+A **reporting tag** is a label you choose on transactions, so you can see sales and purchases split by anything that matters to you. For example *Region: North / South / East / West*, *Branch: Chennai / Coimbatore* or *Project: Mall / Hospital*.
+
+1. Go to **Settings → Reporting tags → + New tag**.
+2. Give it a name, type the values (one per line) and tick the documents it's used on. Tick **Required** if every document must have a value.
+3. On each invoice, bill or order, choose the value under **Reporting tags**, below the header fields.
+
+Then:
+- **Filter lists**: on the invoice list (and the others), a dropdown appears for each tag.
+- **Reports**: **Sales by Reporting Tag** and **Purchases by Reporting Tag** total each value. Documents without a value show as *(not tagged)*.
+
+Tags show on screen but are not printed on the customer's PDF. For information the customer should see, use a custom field instead.
+
+## MSME vendors
+
+On a vendor, under **Other details**, tick **This vendor is MSME (Udyam) registered** and enter the MSME type and Udyam number (like *UDYAM-TN-02-0012345*). Under the MSMED Act, bills from MSMEs must be paid within **45 days**. The report **Reports → MSME Vendor Payments Due** lists their unpaid bills with the *pay by* date, oldest first, and marks late ones as **overdue**.

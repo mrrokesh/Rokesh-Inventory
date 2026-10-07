@@ -12,6 +12,7 @@ import { ApplyCreditModal, PackageModal, ReceiveModal, RefundModal, ReturnModal 
 import { CHALLAN_TYPES } from './config';
 import { Comments, EmailModal } from '../../components/Comms';
 import { CustomFieldValues } from '../../components/CustomFields';
+import { TagValues } from '../../components/ReportingTags';
 
 const EMAILABLE = ['estimates', 'sales_orders', 'invoices', 'credit_notes', 'delivery_challans', 'purchase_orders', 'vendor_credits'];
 
@@ -103,6 +104,7 @@ export function DocPaper({ cfg, doc, org, template = null, preview = false }: an
           {doc.warehouse_name && <><dt>Warehouse</dt><dd>{doc.warehouse_name}</dd></>}
           {cfg.key === 'vendor_credits' && <><dt>Goods returned</dt><dd>{doc.return_stock ? 'Yes' : 'No'}</dd></>}
           {t.show_custom_fields && <CustomFieldValues entity={cfg.entity} values={doc.custom_fields} pdf />}
+          {!preview && <TagValues module={cfg.entity} values={doc.tags} />}
         </dl>
       </div>
       <table className="table mt" style={{ marginTop: 24 }}>

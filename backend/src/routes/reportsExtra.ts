@@ -572,4 +572,53 @@ export const EXTRA_REPORTS: any = {
       return { columns: [col('name', 'Key name'), col('prefix', 'Starts with'), col('user_name', 'Acts as user'), col('created_at', 'Created', 'datetime'), col('last_used_at', 'Last used', 'datetime')], rows };
     },
   },
+  // ================================================================ reporting tags & MSME
+  sales_by_tag: {
+    group: 'Sales', title: 'Sales by Reporting Tag', dated: true, warehouse: false,
+    description: 'Invoiced sales for each reporting tag value (e.g. Region: North / South). Invoices without the tag are shown as “(not tagged)”.',
+    run: async ({ org, from, to }) => tagReport(org, from, to, 'invoices', SALE, 'invoice'),
+  },
+  purchases_by_tag: {
+    group: 'Purchases', title: 'Purchases by Reporting Tag', dated: true, warehouse: false,
+    description: 'Billed purchases for each reporting tag value.',
+    run: async ({ org, from, to }) => tagReport(org, from, to, 'bills', BILL, 'bill'),
+  },
+  msme_payables: {
+    group: 'Payables', title: 'MSME Vendor Payments Due', dated: false, warehouse: false,
+    description: 'Unpaid bills from MSME (Udyam-registered) vendors. Under the MSMED Act they must be paid within 45 days of the bill — late ones are shown first.',
+    run: async ({ org }) => {
+      const { rows } = await query(
+        `SELECT d.id, d.number, d.doc_date, c.display_name AS vendor, d.contact_id, c.msme_type, c.udyam_number,
+                d.doc_date + 45 AS pay_by, (CURRENT_DATE - d.doc_date)::int AS days, d.total, d.balance,
+                CASE WHEN CURRENT_DATE - d.doc_date > 45 THEN 'overdue' WHEN CURRENT_DATE - d.doc_date > 30 THEN 'due_soon' ELSE 'open' END AS status
+           FROM bills d JOIN contacts c ON c.id = d.contact_id
+          WHERE d.org_id = $1 AND c.msme_registered AND d.status IN ('open','partially_paid') AND d.balance > 0
+          ORDER BY d.doc_date`,
+        [org],
+      );
+      return {
+        columns: [col('number', 'Bill#', 'text', '/bills/{id}'), col('doc_date', 'Bill date', 'date'), col('vendor', 'Vendor', 'text', '/vendors/{contact_id}'),
+          col('msme_type', 'MSME type', 'label'), col('udyam_number', 'Udyam number'), col('days', 'Days since bill', 'number'), col('pay_by', 'Pay by (45 days)', 'date'),
+          col('status', 'Status', 'status'), col('balance', 'Balance due', 'money')],
+        rows, totals: sumCols(rows, ['balance']),
+      };
+    },
+  },
 };
+
+async function tagReport(org, from, to, table, statuses, module) {
+  const { rows } = await query(
+    `WITH t AS (SELECT id, name FROM reporting_tags WHERE org_id = $1 AND $4 = ANY(modules))
+     SELECT t.name AS tag, COALESCE(d.tags->>t.id::text, '(not tagged)') AS value, COUNT(*)::int AS documents,
+            SUM(d.sub_total - d.discount_total) AS amount, SUM(d.total) AS total
+       FROM ${table} d CROSS JOIN t
+      WHERE d.org_id = $1 AND d.status IN ${statuses} AND d.doc_date BETWEEN $2 AND $3
+      GROUP BY t.name, 2 ORDER BY t.name, total DESC`,
+    [org, from, to, module],
+  );
+  return {
+    columns: [col('tag', 'Reporting tag'), col('value', 'Value'), col('documents', module === 'invoice' ? 'Invoices' : 'Bills', 'number'),
+      col('amount', 'Amount (excl. tax)', 'money'), col('total', 'Total', 'money')],
+    rows, chart: { type: 'bar', label: 'value', value: 'total', limit: 12 },
+  };
+}

@@ -247,3 +247,72 @@ export function BrandingSettings() {
     </>
   );
 }
+
+// ------------------------------------------------------------------ reporting tags
+export function ReportingTagsSettings() {
+  const { can } = useAuth();
+  const toast = useToast();
+  const [busy, run] = useAction(toast);
+  const { data, reload } = useApi('/settings/reporting-tags');
+  const [edit, setEdit] = useState(null);
+  const editable = can('settings', 'edit');
+  if (!data) return <Spinner />;
+  const modules = data.modules;
+  const refresh = () => { reload(); invalidateLookups('reportingTags'); };
+  const save = async () => {
+    const ok = await run(() => (edit.id ? api.put(`/settings/reporting-tags/${edit.id}`, edit) : api.post('/settings/reporting-tags', edit)), 'Reporting tag saved');
+    if (ok) { setEdit(null); refresh(); }
+  };
+  const remove = async (t) => {
+    if (!(await confirmDialog({ message: `Delete the tag “${t.name}”? Values already chosen on documents stay saved but are no longer shown or reported.`, danger: true, confirmText: 'Delete' }))) return;
+    if ((await run(() => api.del(`/settings/reporting-tags/${t.id}`), 'Reporting tag deleted')) !== undefined) refresh();
+  };
+  const set = (k) => (v) => setEdit((x) => ({ ...x, [k]: v }));
+  return (
+    <>
+      <PageHead title="Reporting Tags">
+        {editable && <button type="button" className="btn primary" onClick={() => setEdit({ name: '', options: '', modules: Object.keys(modules), required: false, is_active: true })}>+ New tag</button>}
+      </PageHead>
+      <p className="muted" style={{ marginTop: 0 }}>
+        Label your transactions to see results by region, branch, project, sales team or anything else. For example a tag <b>Region</b> with values <i>North, South, East, West</i>.
+        Choose the value on each document, then filter lists by it and open <b>Reports → Sales by Reporting Tag</b>.
+      </p>
+      <div className="card table-wrap"><table className="table">
+        <thead><tr><th>Tag</th><th>Values</th><th>Used on</th><th>Required</th><th>Status</th>{editable && <th />}</tr></thead>
+        <tbody>
+          {!data.tags.length && <tr><td colSpan={6} className="faint center" style={{ padding: 32 }}>No reporting tags yet.</td></tr>}
+          {data.tags.map((t) => (
+            <tr key={t.id}>
+              <td className="bold">{t.name}</td>
+              <td className="small">{(t.options || []).join(', ')}</td>
+              <td className="small">{t.modules.length === Object.keys(modules).length ? 'All documents' : t.modules.map((m) => modules[m]).join(', ')}</td>
+              <td>{t.required ? 'Yes' : 'No'}</td>
+              <td><Badge status={t.is_active ? 'active' : 'inactive'} /></td>
+              {editable && <td className="right" style={{ whiteSpace: 'nowrap' }}>
+                <button type="button" className="btn sm" onClick={() => setEdit({ ...t, options: (t.options || []).join('\n') })}>Edit</button>
+                <button type="button" className="btn sm danger" disabled={busy} onClick={() => remove(t)}>Delete</button>
+              </td>}
+            </tr>
+          ))}
+        </tbody>
+      </table></div>
+      {edit && (
+        <Modal title={edit.id ? `Edit “${edit.name}”` : 'New reporting tag'} onClose={() => setEdit(null)}
+          footer={<><button type="button" className="btn primary" disabled={busy || !edit.name} onClick={save}>Save</button><button type="button" className="btn" onClick={() => setEdit(null)}>Cancel</button></>}>
+          <div className="stack">
+            <Field label="Tag name" required hint="e.g. Region, Branch, Project, Sales team"><Input value={edit.name} onChange={set('name')} autoFocus /></Field>
+            <Field label="Values" required hint="One per line."><Textarea rows={5} value={edit.options} onChange={set('options')} /></Field>
+            <div>
+              <div className="small muted mb">Use on</div>
+              <div className="grid-2">{Object.entries(modules).map(([k, l]: any) => (
+                <Checkbox key={k} checked={edit.modules.includes(k)} onChange={(v) => set('modules')(v ? [...edit.modules, k] : edit.modules.filter((m) => m !== k))}>{l}</Checkbox>
+              ))}</div>
+            </div>
+            <Checkbox checked={edit.required} onChange={set('required')}>Required — documents can’t be saved without a value</Checkbox>
+            <Checkbox checked={edit.is_active} onChange={set('is_active')}>Active</Checkbox>
+          </div>
+        </Modal>
+      )}
+    </>
+  );
+}

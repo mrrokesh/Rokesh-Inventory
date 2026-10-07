@@ -9,6 +9,7 @@ import { ContactPicker, ItemPicker } from '../../components/Pickers';
 import { BackLink, Checkbox, ErrorBox, Field, Input, PageHead, Select, Spinner, Textarea } from '../../components/ui';
 import { useToast } from '../../components/Toast';
 import { CustomFieldInputs } from '../../components/CustomFields';
+import { TagInputs } from '../../components/ReportingTags';
 import { BILL_ACCOUNTS, computeTotals } from './config';
 
 let lineSeq = 0;
@@ -32,7 +33,7 @@ export default function DocForm({ cfg }: any) {
     number: '', reference: '', doc_date: today(), warehouse_id: '', discount_percent: 0, shipping_charge: '', adjustment: '', notes: '', terms: '',
     payment_terms: 0, due_date: '', expected_shipment_date: '', expected_delivery_date: '', delivery_method: '', salesperson: '', shipment_preference: '',
     return_stock: false, sales_order_id: null, purchase_order_id: null, invoice_id: null, sales_return_id: null, bill_id: null,
-    delivery_challan_id: null, place_of_supply: '', expiry_date: '', challan_type: 'supply_on_approval', custom_fields: {},
+    delivery_challan_id: null, place_of_supply: '', expiry_date: '', challan_type: 'supply_on_approval', custom_fields: {}, tags: {},
   });
   const { user } = useAuth();
   const [trackFor, setTrackFor] = useState(null);
@@ -294,6 +295,7 @@ export default function DocForm({ cfg }: any) {
             )}
           </div>
           <CustomFieldInputs entity={cfg.entity} value={h.custom_fields} onChange={set('custom_fields')} layout="grid" isNew={!editing} title="" />
+          <TagInputs module={cfg.entity} value={h.tags} onChange={set('tags')} />
         </div></div>
 
         <div className="card mb">

@@ -33,7 +33,7 @@ const STATUS_COLORS = {
   not_invoiced: 'grey', partially_invoiced: 'orange', invoiced: 'green',
   received: 'green', partially_received: 'orange', not_billed: 'grey', partially_billed: 'orange', billed: 'green',
   adjusted: 'green', approved: 'blue', credited: 'green', active: 'green', inactive: 'grey', invited: 'orange',
-  low: 'orange', out: 'red', in_stock: 'green',
+  low: 'orange', out: 'red', in_stock: 'green', due_soon: 'orange',
   expired: 'red', accepted: 'green', declined: 'red', converted: 'purple', shopify: 'purple', direct: 'grey',
 };
 
