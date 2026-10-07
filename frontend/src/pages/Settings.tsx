@@ -10,6 +10,7 @@ import { useToast } from '../components/Toast';
 import { Developer, EmailSettings, Integrations } from './SettingsExtra';
 import { BrandingSettings, CurrenciesSettings, CustomFieldsSettings, ReportingTagsSettings, TemplatesSettings } from './SettingsCustom';
 import WorkflowSettings from './Workflows';
+import { CustomModulesSettings, WebFormsSettings, WebTabsSettings } from './SettingsModules';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -451,7 +452,7 @@ function AuditLog() {
 
 // ------------------------------------------------------------------ shell
 const LINKS = [
-  ['organization', 'Organization profile'], ['branding', 'Branding'], ['warehouses', 'Warehouses'], ['taxes', 'Taxes'], ['currencies', 'Currencies'], ['units', 'Units'], ['numbering', 'Number series'], ['custom-fields', 'Custom fields'], ['reporting-tags', 'Reporting tags'], ['templates', 'PDF templates'], ['workflows', 'Workflow rules'],
+  ['organization', 'Organization profile'], ['branding', 'Branding'], ['warehouses', 'Warehouses'], ['taxes', 'Taxes'], ['currencies', 'Currencies'], ['units', 'Units'], ['numbering', 'Number series'], ['custom-fields', 'Custom fields'], ['reporting-tags', 'Reporting tags'], ['templates', 'PDF templates'], ['workflows', 'Workflow rules'], ['custom-modules', 'Custom modules'], ['web-forms', 'Web forms'], ['web-tabs', 'Web tabs'],
   ['carriers', 'Shipping carriers'], ['email', 'Email'], ['announcements', 'Announcements'], ['integrations', 'Integrations'],
   ['developer', 'API keys & webhooks', 'users'], ['users', 'Users', 'users'], ['roles', 'Roles & permissions', 'users'], ['audit', 'Audit log', 'reports'],
 ];
@@ -544,6 +545,9 @@ export default function Settings() {
             <Route path="reporting-tags" element={<ReportingTagsSettings />} />
             <Route path="templates" element={<TemplatesSettings />} />
             <Route path="workflows" element={<WorkflowSettings />} />
+            <Route path="custom-modules" element={<CustomModulesSettings />} />
+            <Route path="web-forms" element={<WebFormsSettings />} />
+            <Route path="web-tabs" element={<WebTabsSettings />} />
             <Route path="warehouses" element={<Warehouses />} />
             <Route path="taxes" element={<Taxes />} />
             <Route path="currencies" element={<CurrenciesSettings />} />

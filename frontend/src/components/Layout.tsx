@@ -77,13 +77,20 @@ const SEARCH_LINKS = {
 function Sidebar() {
   const { can } = useAuth();
   const { pathname } = useLocation();
+  const { customModules, webTabs } = useLookups('customModules', 'webTabs');
+  // Custom modules and web tabs the organization added appear in their own group.
+  const extra = [
+    ...(customModules?.modules || []).filter((m) => m.show_in_nav).map((m) => ({ label: m.name, to: `/m/${m.slug}`, perm: 'custom_modules' })),
+    ...(webTabs || []).map((t) => ({ label: t.name, to: `/tabs/${t.id}` })),
+  ];
+  const nav = extra.length ? [...NAV.slice(0, NAV.findIndex((g) => g.key === 'tasks')), { key: 'more', label: 'More', icon: 'documents', children: extra }, ...NAV.slice(NAV.findIndex((g) => g.key === 'tasks'))] : NAV;
   const isActive = (to) => (to === '/' ? pathname === '/' : pathname === to || pathname.startsWith(`${to}/`));
-  const initialOpen = () => Object.fromEntries(NAV.filter((g) => g.children).map((g) => [g.key, g.children.some((c) => isActive(c.to))]));
+  const initialOpen = () => Object.fromEntries(nav.filter((g) => g.children).map((g) => [g.key, g.children.some((c) => isActive(c.to))]));
   const [open, setOpen] = useState(initialOpen);
   useEffect(() => {
-    setOpen((o) => ({ ...o, ...Object.fromEntries(NAV.filter((g) => g.children && g.children.some((c) => isActive(c.to))).map((g) => [g.key, true])) }));
+    setOpen((o) => ({ ...o, ...Object.fromEntries(nav.filter((g) => g.children && g.children.some((c) => isActive(c.to))).map((g) => [g.key, true])) }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]);
+  }, [pathname, extra.length]);
 
   return (
     <nav className="sidebar no-print" aria-label="Main">
@@ -91,9 +98,9 @@ function Sidebar() {
         <img className="brand-mark" src={LOGO_SRC} alt="" />
         <span className="brand-name">{APP_NAME}</span>
       </Link>
-      {NAV.map((g) => {
+      {nav.map((g: any) => {
         if (g.children) {
-          const children = g.children.filter((c) => can(c.perm));
+          const children = g.children.filter((c) => !c.perm || can(c.perm));
           if (!children.length) return null;
           const active = children.some((c) => isActive(c.to));
           return (

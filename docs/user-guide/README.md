@@ -22,6 +22,7 @@ The same guides appear inside the app under **Help & Guides** (and the **?** but
 - [Serial numbers and batches](serial-batch.md)
 - [Custom fields, PDF templates and branding](customization.md)
 - [Workflow rules](workflows.md)
+- [Custom modules, web forms and web tabs](modules-forms.md)
 - [GST: invoices and returns](gst.md)
 - [Reports](reports.md)
 - [Documents, attachments and printing](documents.md)

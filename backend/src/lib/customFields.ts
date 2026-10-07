@@ -40,7 +40,11 @@ const empty = (v) => v === undefined || v === null || (typeof v === 'string' && 
  * Unknown keys are dropped; values of inactive/removed fields already stored are kept.
  */
 export async function parseCustomFields(db, orgId, entity, input, existing = {}) {
-  const defs = await fieldDefs(db, orgId, entity);
+  return validateFieldValues(await fieldDefs(db, orgId, entity), input, existing);
+}
+
+/** Validate values against field definitions ({ field_key, label, field_type, options, required, default_value, pattern, pattern_message }). */
+export function validateFieldValues(defs, input, existing = {}) {
   const src = input && typeof input === 'object' ? input : {};
   const out = { ...(existing || {}) };
   for (const d of defs) {

@@ -26,7 +26,7 @@ export function customFieldText(d, v) {
   return String(v);
 }
 
-function FieldInput({ d, value, onChange, disabled }: any) {
+export function FieldInput({ d, value, onChange, disabled }: any) {
   const common = { value: value ?? '', onChange, disabled, required: d.required };
   switch (d.field_type) {
     case 'textarea': return <Textarea {...common} rows={3} />;

@@ -12,7 +12,7 @@ import Icon from './Icon';
  */
 export default function DataTable({
   endpoint, columns, rowLink, filters = [], params: fixedParams = {}, bulkActions = [], exportName,
-  toolbarExtra, emptyTitle = 'Nothing here yet', emptyText, emptyAction, perPage = 25, reloadKey = 0, searchPlaceholder = 'Search',
+  toolbarExtra, emptyTitle = 'Nothing here yet', emptyText, emptyAction, perPage = 25, reloadKey = 0, searchPlaceholder = 'Search', onData = null,
 }: any) {
   const navigate = useNavigate();
   const toast = useToast();
@@ -37,7 +37,7 @@ export default function DataTable({
     let alive = true;
     setState((s) => ({ ...s, loading: true, error: null }));
     api.get(endpoint, query)
-      .then((res) => { if (alive) { setState({ loading: false, data: res.data || res, total: res.total ?? (res.data || res).length, error: null }); setSelected(new Set()); } })
+      .then((res) => { if (alive) { setState({ loading: false, data: res.data || res, total: res.total ?? (res.data || res).length, error: null }); setSelected(new Set()); onData?.(res); } })
       .catch((error) => alive && setState({ loading: false, data: [], total: 0, error }));
     return () => { alive = false; };
   }, [endpoint, query, reloadKey, tick]);

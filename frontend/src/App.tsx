@@ -58,6 +58,11 @@ const TaskDetail = lazy(() => import('./pages/WarehouseOps').then((m) => ({ defa
 const ReportsIndex = lazy(() => import('./pages/Reports').then((m) => ({ default: m.ReportsIndex })));
 const ReportView = lazy(() => import('./pages/Reports').then((m) => ({ default: m.ReportView })));
 const ReportBuilder = lazy(() => import('./pages/ReportBuilder'));
+const ModuleList = lazy(() => import('./pages/CustomModules').then((m) => ({ default: m.ModuleList })));
+const ModuleRecordForm = lazy(() => import('./pages/CustomModules').then((m) => ({ default: m.ModuleRecordForm })));
+const ModuleRecordDetail = lazy(() => import('./pages/CustomModules').then((m) => ({ default: m.ModuleRecordDetail })));
+const WebTabPage = lazy(() => import('./pages/CustomModules').then((m) => ({ default: m.WebTabPage })));
+const PublicForm = lazy(() => import('./pages/PublicForm'));
 const Documents = lazy(() => import('./pages/Documents'));
 const Import = lazy(() => import('./pages/Import'));
 const Settings = lazy(() => import('./pages/Settings'));
@@ -84,6 +89,13 @@ export default function App() {
   useEffect(() => { if (user) setCurrency(user.currency); }, [user]);
   useEffect(() => { document.querySelector('.content')?.scrollTo(0, 0); }, [location.pathname]);
 
+  if (location.pathname.startsWith('/f/')) {
+    return (
+      <Suspense fallback={<Spinner />}>
+        <Routes><Route path="/f/:token" element={<PublicForm />} /></Routes>
+      </Suspense>
+    );
+  }
   if (location.pathname.startsWith('/portal/')) {
     return (
       <Suspense fallback={<Spinner />}>
@@ -192,6 +204,11 @@ export default function App() {
           <Route path="/payments-made/:id/edit" element={<Guard perm="payments_made" action="edit"><PaymentForm key="pme" kind="made" /></Guard>} />
 
           <Route path="/reports" element={<Guard perm="reports"><ReportsIndex /></Guard>} />
+          <Route path="/m/:slug" element={<Guard perm="custom_modules"><ModuleList /></Guard>} />
+          <Route path="/m/:slug/new" element={<Guard perm="custom_modules" action="create"><ModuleRecordForm key="new" /></Guard>} />
+          <Route path="/m/:slug/:id/edit" element={<Guard perm="custom_modules" action="edit"><ModuleRecordForm /></Guard>} />
+          <Route path="/m/:slug/:id" element={<Guard perm="custom_modules"><ModuleRecordDetail /></Guard>} />
+          <Route path="/tabs/:id" element={<WebTabPage />} />
           <Route path="/reports/custom/new" element={<Guard perm="reports"><ReportBuilder key="new" /></Guard>} />
           <Route path="/reports/custom/:id/edit" element={<Guard perm="reports"><ReportBuilder /></Guard>} />
           <Route path="/reports/:key" element={<Guard perm="reports"><ReportView /></Guard>} />

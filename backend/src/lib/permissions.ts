@@ -18,6 +18,7 @@ export const MODULES = {
   vendor_credits: ['view', 'create', 'edit', 'delete'],
   reports: ['view', 'export'],
   documents: ['view', 'create', 'delete'],
+  custom_modules: ['view', 'create', 'edit', 'delete', 'export'],   // records of organization-defined modules
   settings: ['view', 'edit'],
   users: ['view', 'create', 'edit', 'delete'],
 };
@@ -44,7 +45,7 @@ export const DEFAULT_ROLES = [
     is_admin: false,
     permissions: {
       ...crud(['customers', 'estimates', 'sales_orders', 'delivery_challans', 'packages', 'invoices', 'payments_received', 'sales_returns']),
-      ...viewOnly(['items']), documents: ['view', 'create'], reports: ['view'],
+      ...viewOnly(['items']), documents: ['view', 'create'], reports: ['view'], custom_modules: ['view', 'create', 'edit'],
     },
   },
   {
@@ -53,7 +54,7 @@ export const DEFAULT_ROLES = [
     is_admin: false,
     permissions: {
       ...crud(['vendors', 'purchase_orders', 'purchase_receives', 'bills', 'payments_made', 'vendor_credits']),
-      ...viewOnly(['items']), documents: ['view', 'create'], reports: ['view'],
+      ...viewOnly(['items']), documents: ['view', 'create'], reports: ['view'], custom_modules: ['view', 'create', 'edit'],
     },
   },
   {
@@ -63,7 +64,7 @@ export const DEFAULT_ROLES = [
     permissions: {
       items: ['view', 'edit'], inventory: ['view', 'create', 'edit'],
       packages: ['view', 'create', 'edit'], purchase_receives: ['view', 'create'], delivery_challans: ['view', 'create', 'edit'],
-      ...viewOnly(['sales_orders', 'purchase_orders', 'sales_returns']), documents: ['view', 'create'], reports: ['view'],
+      ...viewOnly(['sales_orders', 'purchase_orders', 'sales_returns']), documents: ['view', 'create'], reports: ['view'], custom_modules: ['view', 'create', 'edit'],
     },
   },
   {
@@ -74,7 +75,7 @@ export const DEFAULT_ROLES = [
       ...all(['invoices', 'payments_received', 'bills', 'payments_made', 'vendor_credits', 'reports']),
       sales_returns: ['view', 'create', 'edit'],
       ...viewOnly(['items', 'customers', 'vendors', 'estimates', 'sales_orders', 'delivery_challans', 'purchase_orders', 'inventory', 'settings']),
-      documents: ['view', 'create'],
+      documents: ['view', 'create'], custom_modules: ['view', 'create', 'edit'],
     },
   },
 ];

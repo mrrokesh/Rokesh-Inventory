@@ -31,6 +31,8 @@ import commentRoutes from './routes/comments.js';
 import workflowRoutes from './routes/workflows.js';
 import landedCostRoutes from './routes/landedCosts.js';
 import currencyRoutes from './routes/currencies.js';
+import { modulesRouter, recordsRouter, webTabsRouter, webFormsRouter } from './routes/customModules.js';
+import publicFormRoutes from './routes/publicForms.js';
 import { startWorkflowWorkers } from './lib/workflows.js';
 import { startReportScheduler } from './routes/reportSchedules.js';
 import portalRoutes, { portalAdmin, vendorPortalAdmin } from './routes/portal.js';
@@ -74,6 +76,7 @@ app.use('/uploads/public', express.static(publicDir, { maxAge: '7d', fallthrough
 
 app.use('/api/auth', authRoutes);
 app.use('/api/portal', portalRoutes);
+app.use('/api/public', publicFormRoutes);
 app.use('/api/platform', platformRoutes);
 
 const api = express.Router();
@@ -110,6 +113,10 @@ api.use('/payments-made', paymentsRouter('made'));
 api.use('/vendor-credits', vendorCredits);
 api.use('/landed-costs', landedCostRoutes);
 api.use('/currencies', currencyRoutes);
+api.use('/custom-modules', modulesRouter);
+api.use('/m', recordsRouter);
+api.use('/web-tabs', webTabsRouter);
+api.use('/web-forms', webFormsRouter);
 api.use('/documents', documentRoutes);
 api.use('/reports', reportRoutes);
 api.use('/email', emailRoutes);
