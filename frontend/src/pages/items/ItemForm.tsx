@@ -79,7 +79,11 @@ export default function ItemForm({ composite: compositeProp = false }: any) {
   };
 
   if (loading) return <div className="page"><Spinner /></div>;
-  const lk = meta.data || { categories: [], brands: [], manufacturers: [] };
+  const lk = {
+    categories: meta.data?.categories ?? [],
+    brands: meta.data?.brands ?? [],
+    manufacturers: meta.data?.manufacturers ?? [],
+  };
   const taxOptions = taxes.filter((t) => t.kind === 'tax' && t.is_active).map((t) => [t.id, `${t.name} [${t.rate}%]`]);
   const componentCost = components.reduce((s, c) => s + Number(c.cost_price || 0) * Number(c.quantity || 0), 0);
   const componentPrice = components.reduce((s, c) => s + Number(c.selling_price || 0) * Number(c.quantity || 0), 0);

@@ -55,9 +55,10 @@ r.get('/', can('items', 'view'), async (req, res) => {
 
 r.get('/meta/lookups', can('items', 'view'), async (req, res) => {
   const { rows } = await query(
-    `SELECT array_remove(array_agg(DISTINCT category), NULL) AS categories,
-            array_remove(array_agg(DISTINCT brand), NULL) AS brands,
-            array_remove(array_agg(DISTINCT manufacturer), NULL) AS manufacturers
+    // COALESCE: array_agg returns NULL when the org has no items yet; always send lists.
+    `SELECT COALESCE(array_agg(DISTINCT category) FILTER (WHERE category IS NOT NULL AND category <> ''), '{}') AS categories,
+            COALESCE(array_agg(DISTINCT brand) FILTER (WHERE brand IS NOT NULL AND brand <> ''), '{}') AS brands,
+            COALESCE(array_agg(DISTINCT manufacturer) FILTER (WHERE manufacturer IS NOT NULL AND manufacturer <> ''), '{}') AS manufacturers
        FROM items WHERE org_id = $1`,
     [req.orgId],
   );
