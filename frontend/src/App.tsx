@@ -44,6 +44,14 @@ const TransferDetail = lazy(() => import('./pages/Inventory').then((m) => ({ def
 const AssembliesList = lazy(() => import('./pages/Inventory').then((m) => ({ default: m.AssembliesList })));
 const AssemblyForm = lazy(() => import('./pages/Inventory').then((m) => ({ default: m.AssemblyForm })));
 const AssemblyDetail = lazy(() => import('./pages/Inventory').then((m) => ({ default: m.AssemblyDetail })));
+const StockCountsList = lazy(() => import('./pages/WarehouseOps').then((m) => ({ default: m.StockCountsList })));
+const StockCountForm = lazy(() => import('./pages/WarehouseOps').then((m) => ({ default: m.StockCountForm })));
+const StockCountDetail = lazy(() => import('./pages/WarehouseOps').then((m) => ({ default: m.StockCountDetail })));
+const PicklistsList = lazy(() => import('./pages/WarehouseOps').then((m) => ({ default: m.PicklistsList })));
+const PicklistForm = lazy(() => import('./pages/WarehouseOps').then((m) => ({ default: m.PicklistForm })));
+const PicklistDetail = lazy(() => import('./pages/WarehouseOps').then((m) => ({ default: m.PicklistDetail })));
+const TasksList = lazy(() => import('./pages/WarehouseOps').then((m) => ({ default: m.TasksList })));
+const TaskDetail = lazy(() => import('./pages/WarehouseOps').then((m) => ({ default: m.TaskDetail })));
 const ReportsIndex = lazy(() => import('./pages/Reports').then((m) => ({ default: m.ReportsIndex })));
 const ReportView = lazy(() => import('./pages/Reports').then((m) => ({ default: m.ReportView })));
 const Documents = lazy(() => import('./pages/Documents'));
@@ -129,6 +137,15 @@ export default function App() {
           <Route path="/inventory/assemblies" element={<Guard perm="inventory"><AssembliesList /></Guard>} />
           <Route path="/inventory/assemblies/new" element={<Guard perm="inventory" action="create"><AssemblyForm /></Guard>} />
           <Route path="/inventory/assemblies/:id" element={<Guard perm="inventory"><AssemblyDetail /></Guard>} />
+          <Route path="/inventory/stock-counts" element={<Guard perm="inventory"><StockCountsList /></Guard>} />
+          <Route path="/inventory/stock-counts/new" element={<Guard perm="inventory" action="create"><StockCountForm /></Guard>} />
+          <Route path="/inventory/stock-counts/:id" element={<Guard perm="inventory"><StockCountDetail /></Guard>} />
+          <Route path="/inventory/picklists" element={<Guard perm="packages"><PicklistsList /></Guard>} />
+          <Route path="/inventory/picklists/new" element={<Guard perm="packages" action="create"><PicklistForm /></Guard>} />
+          <Route path="/inventory/picklists/:id" element={<Guard perm="packages"><PicklistDetail /></Guard>} />
+
+          <Route path="/tasks" element={<TasksList />} />
+          <Route path="/tasks/:id" element={<TaskDetail />} />
 
           <Route path="/customers" element={<Guard perm="customers"><ContactsList key="c" type="customer" /></Guard>} />
           <Route path="/customers/new" element={<Guard perm="customers" action="create"><ContactForm key="cn" type="customer" /></Guard>} />

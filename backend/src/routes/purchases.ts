@@ -186,7 +186,7 @@ purchaseReceives.delete('/:id', can('purchase_receives', 'delete'), async (req, 
 
 // ================================================================== bills
 export const bills = createDocRouter({
-  ...BILL_CFG, entity: 'bill', module: 'bills', numberType: null, contactType: 'vendor',
+  ...BILL_CFG, entity: 'bill', module: 'bills', numberType: 'bill', contactType: 'vendor',
   hasBalance: true, lineExtra: ['po_line_id', 'account', 'tracking'], filterCols: ['purchase_order_id'],
   listExtraSelect: `CASE WHEN d.status IN ('open','partially_paid') AND d.due_date < CURRENT_DATE THEN 'overdue' ELSE d.status END AS display_status`,
   header: (b, contact) => {

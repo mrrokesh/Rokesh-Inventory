@@ -22,8 +22,10 @@ export const NAV = [
   {
     key: 'inventory', label: 'Inventory', icon: 'inventory', children: [
       { label: 'Inventory Adjustments', to: '/inventory/adjustments', perm: 'inventory' },
+      { label: 'Stock Counts', to: '/inventory/stock-counts', perm: 'inventory' },
       { label: 'Transfer Orders', to: '/inventory/transfers', perm: 'inventory' },
       { label: 'Assemblies', to: '/inventory/assemblies', perm: 'inventory' },
+      { label: 'Picklists', to: '/inventory/picklists', perm: 'packages' },
       { label: 'Packages', to: '/packages', perm: 'packages' },
       { label: 'Shipments', to: '/shipments', perm: 'packages' },
     ],
@@ -50,6 +52,7 @@ export const NAV = [
       { label: 'Vendor Credits', to: '/vendor-credits', perm: 'vendor_credits' },
     ],
   },
+  { key: 'tasks', label: 'Tasks', icon: 'check', to: '/tasks' },
   { key: 'reports', label: 'Reports', icon: 'reports', to: '/reports', perm: 'reports' },
   { key: 'documents', label: 'Documents', icon: 'documents', to: '/documents', perm: 'documents' },
   { key: 'help', label: 'Help & Guides', icon: 'help', to: '/help' },

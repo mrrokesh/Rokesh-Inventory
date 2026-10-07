@@ -203,6 +203,7 @@ export default function DocDetail({ cfg }: any) {
       if (isDraft && P('approve')) actions.push(<button key="c" type="button" className="btn primary" disabled={busy} onClick={() => act('confirm', 'Sales order confirmed — stock committed')}>Confirm</button>);
       if (s === 'confirmed') {
         if (can('packages', 'create') && doc.package_status !== 'packed' && doc.package_status) actions.push(<button key="p" type="button" className="btn primary" onClick={() => setModal('package')}>Create package</button>);
+        if (can('packages', 'create')) actions.push(<Link key="pl" className="btn" to={`/inventory/picklists/new?sales_order=${doc.id}`}>Create picklist</Link>);
         if (can('invoices', 'create') && doc.invoice_status !== 'invoiced') actions.push(<Link key="i" className="btn" to={`/invoices/new?from_so=${doc.id}`}>Create invoice</Link>);
         if (P('approve')) more.push(<button key="v" type="button" className="danger" onClick={() => act('void', 'Sales order voided', { message: `Void ${doc.number}? Committed stock will be released.`, danger: true, confirmText: 'Void' })}>Void</button>);
       }

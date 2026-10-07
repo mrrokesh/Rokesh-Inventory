@@ -239,9 +239,10 @@ function Warehouses() {
 
 // ------------------------------------------------------------------ numbering
 const DOC_NAMES = {
-  sales_order: 'Sales Order', package: 'Package', shipment: 'Shipment', invoice: 'Invoice', payment_received: 'Payment Received', sales_return: 'Sales Return',
-  credit_note: 'Credit Note', purchase_order: 'Purchase Order', purchase_receive: 'Purchase Receive', payment_made: 'Payment Made', vendor_credit: 'Vendor Credit',
-  inventory_adjustment: 'Inventory Adjustment', transfer_order: 'Transfer Order', assembly: 'Assembly',
+  estimate: 'Estimate', sales_order: 'Sales Order', delivery_challan: 'Delivery Challan', package: 'Package', shipment: 'Shipment',
+  invoice: 'Invoice', payment_received: 'Payment Received', sales_return: 'Sales Return', credit_note: 'Credit Note',
+  purchase_order: 'Purchase Order', purchase_receive: 'Purchase Receive', bill: 'Bill', payment_made: 'Payment Made', vendor_credit: 'Vendor Credit',
+  inventory_adjustment: 'Inventory Adjustment', stock_count: 'Stock Count', transfer_order: 'Transfer Order', assembly: 'Assembly', picklist: 'Picklist',
 };
 function Numbering() {
   const { can } = useAuth();

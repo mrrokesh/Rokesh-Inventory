@@ -13,11 +13,14 @@ export const DEFAULT_SERIES = [
   ['credit_note', 'CN-', 5],
   ['purchase_order', 'PO-', 5],
   ['purchase_receive', 'RCV-', 5],
+  ['bill', 'BILL-', 5],
   ['payment_made', 'PM-', 5],
   ['vendor_credit', 'DN-', 5],
   ['inventory_adjustment', 'ADJ-', 5],
   ['transfer_order', 'TO-', 5],
   ['assembly', 'ASM-', 5],
+  ['stock_count', 'SC-', 5],
+  ['picklist', 'PL-', 5],
 ];
 
 export const formatNumber = (prefix, n, padding) => `${prefix}${String(n).padStart(padding, '0')}`;
