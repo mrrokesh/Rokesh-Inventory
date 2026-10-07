@@ -298,6 +298,7 @@ export function PurchaseReceiveDetail() {
     <div className="page narrow">
       <PageHead title={`Purchase Receive ${r.number}`} crumb={<Link to="/purchase-receives">Purchase Receives</Link>}>
         <button type="button" className="btn" onClick={() => window.print()}>Print</button>
+        {can('bills', 'create') && <Link className="btn" to={`/landed-costs/new?source=purchase_receive:${r.id}`}>Add landed cost</Link>}
         {can('purchase_receives', 'delete') && <button type="button" className="btn danger" onClick={remove}>Delete</button>}
       </PageHead>
       <div className="card mb"><div className="card-body">

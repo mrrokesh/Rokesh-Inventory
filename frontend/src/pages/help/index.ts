@@ -12,7 +12,7 @@ export const ARTICLES = [
   { slug: 'contacts', group: 'Everyday work', description: 'Add the customers you sell to and the vendors you buy from.', routes: ['/customers', '/vendors', '/import/customers', '/import/vendors'] },
   { slug: 'selling', group: 'Everyday work', description: 'Sales order → package → shipment → invoice → payment.', routes: ['/sales-orders', '/invoices', '/packages', '/shipments'] },
   { slug: 'estimates-challans', group: 'Everyday work', description: 'Send quotes, and dispatch goods on approval or for job work.', routes: ['/estimates', '/delivery-challans'] },
-  { slug: 'buying', group: 'Everyday work', description: 'Purchase order → receive → bill → payment.', routes: ['/purchase-orders', '/purchase-receives', '/bills', '/vendor-credits'] },
+  { slug: 'buying', group: 'Everyday work', description: 'Purchase order → receive → bill → payment, and landed costs.', routes: ['/purchase-orders', '/purchase-receives', '/bills', '/vendor-credits', '/landed-costs'] },
   { slug: 'returns', group: 'Everyday work', description: 'Take goods back, give credit and refund customers.', routes: ['/sales-returns', '/credit-notes'] },
   { slug: 'payments', group: 'Everyday work', description: 'Record money received and money paid.', routes: ['/payments-received', '/payments-made'] },
   { slug: 'stock', group: 'Stock & reports', description: 'Correct counts, move stock between warehouses, build kits.', routes: ['/inventory'] },

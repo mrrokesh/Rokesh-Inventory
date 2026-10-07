@@ -51,6 +51,7 @@ export const NAV = [
       { label: 'Bills', to: '/bills', perm: 'bills' },
       { label: 'Payments Made', to: '/payments-made', perm: 'payments_made' },
       { label: 'Vendor Credits', to: '/vendor-credits', perm: 'vendor_credits' },
+      { label: 'Landed Costs', to: '/landed-costs', perm: 'bills' },
     ],
   },
   { key: 'tasks', label: 'Tasks', icon: 'check', to: '/tasks' },

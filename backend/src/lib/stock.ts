@@ -143,6 +143,12 @@ export async function revalue(client, ctx, m) {
  * Stock added by the source can only be removed if none of it has been consumed yet.
  */
 export async function reverseSource(client, ctx, sourceType, sourceId) {
+  const { rows: [lc] } = await client.query(
+    `SELECT c.number FROM landed_cost_lines l JOIN landed_costs c ON c.id = l.landed_cost_id
+      WHERE l.source_type = $1 AND l.source_id = $2 AND c.org_id = $3 AND c.status = 'applied' LIMIT 1`,
+    [sourceType, sourceId, ctx.orgId],
+  );
+  if (lc) throw conflict(`Landed cost ${lc.number} has been added to this stock. Void the landed cost first.`);
   await reverseTracking(client, ctx, sourceType, sourceId);
   const { rows: moves } = await client.query(
     `SELECT id, item_id, warehouse_id, quantity, value, movement_date FROM stock_movements
@@ -181,6 +187,22 @@ export async function reverseSource(client, ctx, sourceType, sourceId) {
     );
   }
   await client.query('DELETE FROM stock_movements WHERE id = ANY($1::bigint[])', [moves.map((m) => m.id)]);
+}
+
+/**
+ * Add `perUnit` to the unit cost of one FIFO lot (landed cost). Records a value-only movement for the
+ * part that lands on stock still on hand; returns { onHand, used } values.
+ */
+export async function addLotCost(client, ctx, lotId, perUnit, m) {
+  const { rows: [lot] } = await client.query('SELECT * FROM stock_lots WHERE id = $1 AND org_id = $2 FOR UPDATE', [lotId, ctx.orgId]);
+  if (!lot) throw conflict('A received stock batch no longer exists.');
+  await lockLevel(client, ctx.orgId, lot.item_id, lot.warehouse_id);
+  if (Number(lot.unit_cost) + perUnit < -EPS) throw badRequest('Removing this cost would make the stock cost negative.');
+  await client.query('UPDATE stock_lots SET unit_cost = GREATEST(0, unit_cost + $2) WHERE id = $1', [lotId, perUnit]);
+  const onHand = round2(perUnit * Number(lot.qty_remaining));
+  const used = round2(perUnit * (Number(lot.qty_in) - Number(lot.qty_remaining)));
+  if (onHand) await insertMovement(client, ctx, { ...m, itemId: lot.item_id, warehouseId: lot.warehouse_id }, 0, onHand);
+  return { onHand, used, lot };
 }
 
 /** Adjust committed (reserved for confirmed sales orders) quantity. */

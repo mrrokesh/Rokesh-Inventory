@@ -32,6 +32,9 @@ const SalesReturnsList = lazy(() => import('./pages/Fulfilment').then((m) => ({ 
 const SalesReturnDetail = lazy(() => import('./pages/Fulfilment').then((m) => ({ default: m.SalesReturnDetail })));
 const PurchaseReceivesList = lazy(() => import('./pages/Fulfilment').then((m) => ({ default: m.PurchaseReceivesList })));
 const PurchaseReceiveDetail = lazy(() => import('./pages/Fulfilment').then((m) => ({ default: m.PurchaseReceiveDetail })));
+const LandedCostsList = lazy(() => import('./pages/LandedCosts').then((m) => ({ default: m.LandedCostsList })));
+const LandedCostForm = lazy(() => import('./pages/LandedCosts').then((m) => ({ default: m.LandedCostForm })));
+const LandedCostDetail = lazy(() => import('./pages/LandedCosts').then((m) => ({ default: m.LandedCostDetail })));
 const PaymentsList = lazy(() => import('./pages/Payments').then((m) => ({ default: m.PaymentsList })));
 const PaymentForm = lazy(() => import('./pages/Payments').then((m) => ({ default: m.PaymentForm })));
 const PaymentDetail = lazy(() => import('./pages/Payments').then((m) => ({ default: m.PaymentDetail })));
@@ -174,6 +177,9 @@ export default function App() {
           <Route path="/sales-returns/:id" element={<Guard perm="sales_returns"><SalesReturnDetail /></Guard>} />
           <Route path="/purchase-receives" element={<Guard perm="purchase_receives"><PurchaseReceivesList /></Guard>} />
           <Route path="/purchase-receives/:id" element={<Guard perm="purchase_receives"><PurchaseReceiveDetail /></Guard>} />
+          <Route path="/landed-costs" element={<Guard perm="bills"><LandedCostsList /></Guard>} />
+          <Route path="/landed-costs/new" element={<Guard perm="bills" action="create"><LandedCostForm key={location.search} /></Guard>} />
+          <Route path="/landed-costs/:id" element={<Guard perm="bills"><LandedCostDetail /></Guard>} />
 
           <Route path="/payments-received" element={<Guard perm="payments_received"><PaymentsList key="pr" kind="received" /></Guard>} />
           <Route path="/payments-received/new" element={<Guard perm="payments_received" action="create"><PaymentForm key={`prn${location.search}`} kind="received" /></Guard>} />

@@ -272,6 +272,10 @@ export default function DocDetail({ cfg }: any) {
       if (isDraft && P('approve')) actions.push(<button key="o" type="button" className="btn primary" disabled={busy} onClick={() => act('open', 'Bill opened')}>Convert to open</button>);
       if (['open', 'partially_paid'].includes(s) && can('payments_made', 'create')) actions.push(<Link key="pay" className="btn primary" to={`/payments-made/new?contact=${doc.contact_id}&bill=${doc.id}`}>Record payment</Link>);
       if (['open', 'partially_paid', 'paid'].includes(s) && can('vendor_credits', 'create')) more.push(<Link key="vc" to={`/vendor-credits/new?from_bill=${doc.id}`}>Create vendor credit</Link>);
+      if (['open', 'partially_paid', 'paid'].includes(s) && can('bills', 'create')) {
+        more.push(<Link key="lc" to={`/landed-costs/new?bill=${doc.id}`}>Use as landed cost (freight, duty…)</Link>);
+        if (doc.lines.some((l) => l.track_inventory)) more.push(<Link key="lc2" to={`/landed-costs/new?source=bill:${doc.id}`}>Add landed cost to these goods</Link>);
+      }
       if (['open', 'partially_paid', 'paid'].includes(s) && P('approve')) more.push(<button key="v" type="button" className="danger" onClick={() => act('void', 'Bill voided', { message: `Void bill ${doc.number}?`, danger: true, confirmText: 'Void' })}>Void</button>);
       break;
     case 'vendor_credits':
