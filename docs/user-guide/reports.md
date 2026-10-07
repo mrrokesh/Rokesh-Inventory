@@ -50,6 +50,8 @@ Go to **Reports** in the left menu. Each report answers one question. Pick a per
 
 In the "Details" and "History" reports, **click a number** (invoice#, order#, item, customer) to open that record.
 
+**Filter by reporting tag.** If you use reporting tags (Settings → Reporting tags), sales and purchase reports show a dropdown for each tag next to the period. Choose a value, for example *Region: North*, and the report only counts documents with that tag. The chosen filter is shown next to the dates.
+
 ## Favourite reports
 
 Click the **☆ star** next to a report, on the Reports page or at the top of an open report. Favourites are listed at the top of the Reports page, so the ones you use every day are one click away. Each user has their own favourites.

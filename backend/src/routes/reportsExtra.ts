@@ -13,15 +13,16 @@ const BILL = "('open','partially_paid','paid')";
 export const EXTRA_REPORTS: any = {
   // ================================================================ sales
   sales_summary: {
+    tagged: true,
     group: 'Sales', title: 'Sales Summary', dated: true, warehouse: false,
     description: 'Invoiced sales per day (or per month for long periods): number of invoices, sales, tax and total.',
-    run: async ({ org, from, to }) => {
+    run: async ({ tagSql, org, from, to }) => {
       const days = (Date.parse(to) - Date.parse(from)) / 86400000;
       const unit = days > 62 ? 'month' : 'day';
       const { rows } = await query(
         `SELECT to_char(date_trunc('${unit}', d.doc_date), '${unit === 'month' ? 'Mon YYYY' : 'DD Mon YYYY'}') AS period,
                 COUNT(*)::int AS invoices, SUM((d.sub_total - d.discount_total) * d.exchange_rate) AS sales, SUM(d.tax_total * d.exchange_rate) AS tax, SUM(d.total * d.exchange_rate) AS total
-           FROM invoices d WHERE d.org_id = $1 AND d.status IN ${SALE} AND d.doc_date BETWEEN $2 AND $3
+           FROM invoices d WHERE d.org_id = $1 ${tagSql('d')} AND d.status IN ${SALE} AND d.doc_date BETWEEN $2 AND $3
           GROUP BY date_trunc('${unit}', d.doc_date) ORDER BY date_trunc('${unit}', d.doc_date)`,
         [org, from, to],
       );
@@ -32,14 +33,15 @@ export const EXTRA_REPORTS: any = {
     },
   },
   sales_by_category: {
+    tagged: true,
     group: 'Sales', title: 'Sales by Category', dated: true, warehouse: false,
     description: 'Quantity, sales, cost and margin per item category.',
-    run: async ({ org, from, to }) => {
+    run: async ({ tagSql, org, from, to }) => {
       const { rows } = await query(
         `WITH s AS (
            SELECT l.item_id, SUM(l.quantity) AS quantity, SUM(l.amount * (1 - d.discount_percent / 100) * d.exchange_rate) AS sales
              FROM invoice_lines l JOIN invoices d ON d.id = l.doc_id
-            WHERE d.org_id = $1 AND d.status IN ${SALE} AND d.doc_date BETWEEN $2 AND $3 AND l.item_id IS NOT NULL GROUP BY l.item_id),
+            WHERE d.org_id = $1 ${tagSql('d')} AND d.status IN ${SALE} AND d.doc_date BETWEEN $2 AND $3 AND l.item_id IS NOT NULL GROUP BY l.item_id),
          c AS (SELECT item_id, -SUM(value) AS cogs FROM stock_movements
                 WHERE org_id = $1 AND source_type IN ('shipment','invoice','sales_return') AND movement_date BETWEEN $2 AND $3 GROUP BY item_id)
          SELECT COALESCE(NULLIF(i.category, ''), '(no category)') AS category, COUNT(*)::int AS items, SUM(s.quantity) AS quantity, SUM(s.sales) AS sales,
@@ -57,13 +59,14 @@ export const EXTRA_REPORTS: any = {
     },
   },
   sales_by_channel: {
+    tagged: true,
     group: 'Sales', title: 'Sales by Channel', dated: true, warehouse: false,
     description: 'Invoiced sales per sales channel (direct, Shopify, …), based on the sales order each invoice came from.',
-    run: async ({ org, from, to }) => {
+    run: async ({ tagSql, org, from, to }) => {
       const { rows } = await query(
         `SELECT COALESCE(so.channel, 'direct') AS channel, COUNT(*)::int AS invoices, SUM((d.sub_total - d.discount_total) * d.exchange_rate) AS sales, SUM(d.total * d.exchange_rate) AS total
            FROM invoices d LEFT JOIN sales_orders so ON so.id = d.sales_order_id
-          WHERE d.org_id = $1 AND d.status IN ${SALE} AND d.doc_date BETWEEN $2 AND $3
+          WHERE d.org_id = $1 ${tagSql('d')} AND d.status IN ${SALE} AND d.doc_date BETWEEN $2 AND $3
           GROUP BY 1 ORDER BY total DESC`,
         [org, from, to],
       );
@@ -74,15 +77,16 @@ export const EXTRA_REPORTS: any = {
     },
   },
   invoice_details: {
+    tagged: true,
     group: 'Sales', title: 'Invoice Details', dated: true, warehouse: false,
     description: 'Every invoice in the period with its status, due date, amount and balance.',
-    run: async ({ org, from, to }) => {
+    run: async ({ tagSql, org, from, to }) => {
       const { rows } = await query(
         `SELECT d.id, d.number, d.doc_date, d.due_date, c.display_name AS customer, d.contact_id,
                 CASE WHEN d.status IN ('sent','partially_paid') AND d.due_date < CURRENT_DATE THEN 'overdue' ELSE d.status END AS status,
                 d.total * d.exchange_rate AS total, d.balance * d.exchange_rate AS balance, d.salesperson
            FROM invoices d JOIN contacts c ON c.id = d.contact_id
-          WHERE d.org_id = $1 AND d.doc_date BETWEEN $2 AND $3 ORDER BY d.doc_date DESC, d.number DESC`,
+          WHERE d.org_id = $1 ${tagSql('d')} AND d.doc_date BETWEEN $2 AND $3 ORDER BY d.doc_date DESC, d.number DESC`,
         [org, from, to],
       );
       return {
@@ -93,13 +97,14 @@ export const EXTRA_REPORTS: any = {
     },
   },
   sales_order_details: {
+    tagged: true,
     group: 'Sales', title: 'Sales Order Details', dated: true, warehouse: false,
     description: 'Every sales order in the period with its status and amount.',
-    run: async ({ org, from, to }) => {
+    run: async ({ tagSql, org, from, to }) => {
       const { rows } = await query(
         `SELECT d.id, d.number, d.doc_date, d.expected_shipment_date, c.display_name AS customer, d.contact_id, d.status, d.channel, d.total * d.exchange_rate AS total
            FROM sales_orders d JOIN contacts c ON c.id = d.contact_id
-          WHERE d.org_id = $1 AND d.doc_date BETWEEN $2 AND $3 ORDER BY d.doc_date DESC, d.number DESC`,
+          WHERE d.org_id = $1 ${tagSql('d')} AND d.doc_date BETWEEN $2 AND $3 ORDER BY d.doc_date DESC, d.number DESC`,
         [org, from, to],
       );
       return {
@@ -110,14 +115,15 @@ export const EXTRA_REPORTS: any = {
     },
   },
   estimate_details: {
+    tagged: true,
     group: 'Sales', title: 'Estimate Details', dated: true, warehouse: false,
     description: 'Every estimate (quote) in the period, and whether it was accepted, declined or converted.',
-    run: async ({ org, from, to }) => {
+    run: async ({ tagSql, org, from, to }) => {
       const { rows } = await query(
         `SELECT d.id, d.number, d.doc_date, d.expiry_date, c.display_name AS customer, d.contact_id,
                 CASE WHEN d.status = 'sent' AND d.expiry_date < CURRENT_DATE THEN 'expired' ELSE d.status END AS status, d.total * d.exchange_rate AS total
            FROM estimates d JOIN contacts c ON c.id = d.contact_id
-          WHERE d.org_id = $1 AND d.doc_date BETWEEN $2 AND $3 ORDER BY d.doc_date DESC, d.number DESC`,
+          WHERE d.org_id = $1 ${tagSql('d')} AND d.doc_date BETWEEN $2 AND $3 ORDER BY d.doc_date DESC, d.number DESC`,
         [org, from, to],
       );
       return {
@@ -128,13 +134,14 @@ export const EXTRA_REPORTS: any = {
     },
   },
   delivery_challan_details: {
+    tagged: true,
     group: 'Sales', title: 'Delivery Challan Details', dated: true, warehouse: false,
     description: 'Every delivery challan in the period with its type, status and value.',
-    run: async ({ org, from, to }) => {
+    run: async ({ tagSql, org, from, to }) => {
       const { rows } = await query(
         `SELECT d.id, d.number, d.doc_date, c.display_name AS customer, d.contact_id, d.challan_type, d.status, d.total * d.exchange_rate AS total
            FROM delivery_challans d JOIN contacts c ON c.id = d.contact_id
-          WHERE d.org_id = $1 AND d.doc_date BETWEEN $2 AND $3 ORDER BY d.doc_date DESC, d.number DESC`,
+          WHERE d.org_id = $1 ${tagSql('d')} AND d.doc_date BETWEEN $2 AND $3 ORDER BY d.doc_date DESC, d.number DESC`,
         [org, from, to],
       );
       return {
@@ -145,13 +152,14 @@ export const EXTRA_REPORTS: any = {
     },
   },
   credit_note_details: {
+    tagged: true,
     group: 'Sales', title: 'Credit Note Details', dated: true, warehouse: false,
     description: 'Every credit note in the period with the amount still available to use.',
-    run: async ({ org, from, to }) => {
+    run: async ({ tagSql, org, from, to }) => {
       const { rows } = await query(
         `SELECT d.id, d.number, d.doc_date, c.display_name AS customer, d.contact_id, d.status, d.total * d.exchange_rate AS total, d.balance * d.exchange_rate AS balance
            FROM credit_notes d JOIN contacts c ON c.id = d.contact_id
-          WHERE d.org_id = $1 AND d.doc_date BETWEEN $2 AND $3 ORDER BY d.doc_date DESC, d.number DESC`,
+          WHERE d.org_id = $1 ${tagSql('d')} AND d.doc_date BETWEEN $2 AND $3 ORDER BY d.doc_date DESC, d.number DESC`,
         [org, from, to],
       );
       return {
@@ -422,16 +430,17 @@ export const EXTRA_REPORTS: any = {
     },
   },
   active_purchase_orders: {
+    tagged: true,
     group: 'Purchases', title: 'Open Purchase Orders', dated: false, warehouse: false,
     description: 'Issued purchase orders still waiting for goods or a bill, with what is outstanding.',
-    run: async ({ org }) => {
+    run: async ({ tagSql, org }) => {
       const { rows } = await query(
         `SELECT d.id, d.number, d.doc_date, d.expected_delivery_date, c.display_name AS vendor, d.contact_id,
                 SUM(l.quantity) AS ordered, SUM(l.qty_received) AS received, SUM(l.qty_billed) AS billed,
                 SUM(l.quantity - l.qty_received) AS to_receive, d.total * d.exchange_rate AS total,
                 CASE WHEN d.expected_delivery_date < CURRENT_DATE AND SUM(l.quantity - l.qty_received) > 0 THEN 'overdue' ELSE d.status END AS status
            FROM purchase_orders d JOIN purchase_order_lines l ON l.doc_id = d.id JOIN contacts c ON c.id = d.contact_id
-          WHERE d.org_id = $1 AND d.status = 'issued'
+          WHERE d.org_id = $1 ${tagSql('d')} AND d.status = 'issued'
           GROUP BY d.id, c.display_name ORDER BY d.expected_delivery_date NULLS LAST, d.doc_date`,
         [org],
       );
@@ -444,14 +453,15 @@ export const EXTRA_REPORTS: any = {
     },
   },
   purchase_orders_by_vendor: {
+    tagged: true,
     group: 'Purchases', title: 'Purchase Orders by Vendor', dated: true, warehouse: false,
     description: 'Number and value of purchase orders per vendor, and how much has arrived.',
-    run: async ({ org, from, to }) => {
+    run: async ({ tagSql, org, from, to }) => {
       const { rows } = await query(
         `SELECT c.id, c.display_name AS vendor, COUNT(DISTINCT d.id)::int AS orders, SUM(l.quantity) AS ordered, SUM(l.qty_received) AS received,
                 (SELECT SUM(x.total * x.exchange_rate) FROM purchase_orders x WHERE x.contact_id = c.id AND x.org_id = $1 AND x.status NOT IN ('draft','cancelled') AND x.doc_date BETWEEN $2 AND $3) AS amount
            FROM purchase_orders d JOIN purchase_order_lines l ON l.doc_id = d.id JOIN contacts c ON c.id = d.contact_id
-          WHERE d.org_id = $1 AND d.status NOT IN ('draft','cancelled') AND d.doc_date BETWEEN $2 AND $3
+          WHERE d.org_id = $1 ${tagSql('d')} AND d.status NOT IN ('draft','cancelled') AND d.doc_date BETWEEN $2 AND $3
           GROUP BY c.id ORDER BY amount DESC`,
         [org, from, to],
       );
@@ -462,14 +472,15 @@ export const EXTRA_REPORTS: any = {
     },
   },
   purchases_by_category: {
+    tagged: true,
     group: 'Purchases', title: 'Purchases by Category', dated: true, warehouse: false,
     description: 'Value of goods billed per item category.',
-    run: async ({ org, from, to }) => {
+    run: async ({ tagSql, org, from, to }) => {
       const { rows } = await query(
         `SELECT COALESCE(NULLIF(i.category, ''), '(no category)') AS category, COUNT(DISTINCT l.item_id)::int AS items, SUM(l.quantity) AS quantity,
                 SUM(l.amount * (1 - d.discount_percent / 100) * d.exchange_rate) AS amount
            FROM bill_lines l JOIN bills d ON d.id = l.doc_id JOIN items i ON i.id = l.item_id
-          WHERE d.org_id = $1 AND d.status IN ${BILL} AND d.doc_date BETWEEN $2 AND $3
+          WHERE d.org_id = $1 ${tagSql('d')} AND d.status IN ${BILL} AND d.doc_date BETWEEN $2 AND $3
           GROUP BY 1 ORDER BY amount DESC`,
         [org, from, to],
       );
@@ -480,14 +491,15 @@ export const EXTRA_REPORTS: any = {
     },
   },
   bill_details: {
+    tagged: true,
     group: 'Purchases', title: 'Bill Details', dated: true, warehouse: false,
     description: 'Every bill in the period with its status, due date, amount and balance.',
-    run: async ({ org, from, to }) => {
+    run: async ({ tagSql, org, from, to }) => {
       const { rows } = await query(
         `SELECT d.id, d.number, d.doc_date, d.due_date, c.display_name AS vendor, d.contact_id,
                 CASE WHEN d.status IN ('open','partially_paid') AND d.due_date < CURRENT_DATE THEN 'overdue' ELSE d.status END AS status, d.total * d.exchange_rate AS total, d.balance * d.exchange_rate AS balance
            FROM bills d JOIN contacts c ON c.id = d.contact_id
-          WHERE d.org_id = $1 AND d.doc_date BETWEEN $2 AND $3 ORDER BY d.doc_date DESC, d.number DESC`,
+          WHERE d.org_id = $1 ${tagSql('d')} AND d.doc_date BETWEEN $2 AND $3 ORDER BY d.doc_date DESC, d.number DESC`,
         [org, from, to],
       );
       return {
@@ -498,13 +510,14 @@ export const EXTRA_REPORTS: any = {
     },
   },
   vendor_credit_details: {
+    tagged: true,
     group: 'Purchases', title: 'Vendor Credit Details', dated: true, warehouse: false,
     description: 'Every vendor credit in the period with the amount still available.',
-    run: async ({ org, from, to }) => {
+    run: async ({ tagSql, org, from, to }) => {
       const { rows } = await query(
         `SELECT d.id, d.number, d.doc_date, c.display_name AS vendor, d.contact_id, d.status, d.total * d.exchange_rate AS total, d.balance * d.exchange_rate AS balance
            FROM vendor_credits d JOIN contacts c ON c.id = d.contact_id
-          WHERE d.org_id = $1 AND d.doc_date BETWEEN $2 AND $3 ORDER BY d.doc_date DESC, d.number DESC`,
+          WHERE d.org_id = $1 ${tagSql('d')} AND d.doc_date BETWEEN $2 AND $3 ORDER BY d.doc_date DESC, d.number DESC`,
         [org, from, to],
       );
       return {
@@ -621,15 +634,16 @@ export const EXTRA_REPORTS: any = {
     run: async ({ org, from, to }) => tagReport(org, from, to, 'bills', BILL, 'bill'),
   },
   msme_payables: {
+    tagged: true,
     group: 'Payables', title: 'MSME Vendor Payments Due', dated: false, warehouse: false,
     description: 'Unpaid bills from MSME (Udyam-registered) vendors. Under the MSMED Act they must be paid within 45 days of the bill — late ones are shown first.',
-    run: async ({ org }) => {
+    run: async ({ tagSql, org }) => {
       const { rows } = await query(
         `SELECT d.id, d.number, d.doc_date, c.display_name AS vendor, d.contact_id, c.msme_type, c.udyam_number,
                 d.doc_date + 45 AS pay_by, (CURRENT_DATE - d.doc_date)::int AS days, d.total * d.exchange_rate AS total, d.balance * d.exchange_rate AS balance,
                 CASE WHEN CURRENT_DATE - d.doc_date > 45 THEN 'overdue' WHEN CURRENT_DATE - d.doc_date > 30 THEN 'due_soon' ELSE 'open' END AS status
            FROM bills d JOIN contacts c ON c.id = d.contact_id
-          WHERE d.org_id = $1 AND c.msme_registered AND d.status IN ('open','partially_paid') AND d.balance > 0
+          WHERE d.org_id = $1 ${tagSql('d')} AND c.msme_registered AND d.status IN ('open','partially_paid') AND d.balance > 0
           ORDER BY d.doc_date`,
         [org],
       );

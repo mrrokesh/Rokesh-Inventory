@@ -229,14 +229,15 @@ const REPORTS: any = {
 
   // ---------------------------------------------------------------- sales
   sales_by_item: {
+    tagged: true,
     group: 'Sales', title: 'Sales by Item', dated: true, warehouse: false,
     description: 'Quantity sold, sales value, cost of goods and margin per item (from issued invoices).',
-    run: async ({ org, from, to }) => {
+    run: async ({ tagSql, org, from, to }) => {
       const { rows } = await query(
         `WITH s AS (
            SELECT l.item_id, SUM(l.quantity) AS quantity, SUM(l.amount * (1 - d.discount_percent / 100) * d.exchange_rate) AS sales
              FROM invoice_lines l JOIN invoices d ON d.id = l.doc_id
-            WHERE d.org_id = $1 AND d.status NOT IN ('draft','void') AND d.doc_date BETWEEN $2 AND $3 AND l.item_id IS NOT NULL
+            WHERE d.org_id = $1 ${tagSql('d')} AND d.status NOT IN ('draft','void') AND d.doc_date BETWEEN $2 AND $3 AND l.item_id IS NOT NULL
             GROUP BY l.item_id),
          c AS (
            SELECT item_id, -SUM(value) AS cogs FROM stock_movements
@@ -257,14 +258,15 @@ const REPORTS: any = {
     },
   },
   sales_by_customer: {
+    tagged: true,
     group: 'Sales', title: 'Sales by Customer', dated: true, warehouse: false,
     description: 'Invoice count and sales per customer.',
-    run: async ({ org, from, to }) => {
+    run: async ({ tagSql, org, from, to }) => {
       const { rows } = await query(
         `SELECT c.display_name AS customer, COUNT(*)::int AS invoices, SUM((d.sub_total - d.discount_total) * d.exchange_rate) AS sales,
                 SUM(d.tax_total * d.exchange_rate) AS tax, SUM(d.total * d.exchange_rate) AS total, SUM(d.balance * d.exchange_rate) AS balance
            FROM invoices d JOIN contacts c ON c.id = d.contact_id
-          WHERE d.org_id = $1 AND d.status NOT IN ('draft','void') AND d.doc_date BETWEEN $2 AND $3
+          WHERE d.org_id = $1 ${tagSql('d')} AND d.status NOT IN ('draft','void') AND d.doc_date BETWEEN $2 AND $3
           GROUP BY c.id ORDER BY total DESC`,
         [org, from, to],
       );
@@ -277,12 +279,13 @@ const REPORTS: any = {
     },
   },
   sales_by_salesperson: {
+    tagged: true,
     group: 'Sales', title: 'Sales by Salesperson', dated: true, warehouse: false,
     description: 'Invoiced sales grouped by salesperson.',
-    run: async ({ org, from, to }) => {
+    run: async ({ tagSql, org, from, to }) => {
       const { rows } = await query(
         `SELECT COALESCE(d.salesperson, '(none)') AS salesperson, COUNT(*)::int AS invoices, SUM((d.sub_total - d.discount_total) * d.exchange_rate) AS sales, SUM(d.total * d.exchange_rate) AS total
-           FROM invoices d WHERE d.org_id = $1 AND d.status NOT IN ('draft','void') AND d.doc_date BETWEEN $2 AND $3
+           FROM invoices d WHERE d.org_id = $1 ${tagSql('d')} AND d.status NOT IN ('draft','void') AND d.doc_date BETWEEN $2 AND $3
           GROUP BY 1 ORDER BY total DESC`,
         [org, from, to],
       );
@@ -290,14 +293,15 @@ const REPORTS: any = {
     },
   },
   order_fulfillment: {
+    tagged: true,
     group: 'Sales', title: 'Order Fulfillment', dated: true, warehouse: false,
     description: 'Ordered, packed, shipped and invoiced quantities per sales order.',
-    run: async ({ org, from, to }) => {
+    run: async ({ tagSql, org, from, to }) => {
       const { rows } = await query(
         `SELECT d.number, d.doc_date, c.display_name AS customer, d.status, d.expected_shipment_date,
                 SUM(l.quantity) AS ordered, SUM(l.qty_packed) AS packed, SUM(l.qty_shipped) AS shipped, SUM(l.qty_invoiced) AS invoiced, d.total
            FROM sales_orders d JOIN contacts c ON c.id = d.contact_id JOIN sales_order_lines l ON l.doc_id = d.id
-          WHERE d.org_id = $1 AND d.doc_date BETWEEN $2 AND $3 AND d.status <> 'void'
+          WHERE d.org_id = $1 ${tagSql('d')} AND d.doc_date BETWEEN $2 AND $3 AND d.status <> 'void'
           GROUP BY d.id, c.display_name ORDER BY d.doc_date DESC`,
         [org, from, to],
       );
@@ -310,9 +314,10 @@ const REPORTS: any = {
     },
   },
   customer_balances: {
+    tagged: true,
     group: 'Receivables', title: 'Customer Balances (Receivables Aging)', dated: false, warehouse: false,
     description: 'Outstanding invoice balances per customer, grouped by days overdue.',
-    run: async ({ org }) => {
+    run: async ({ tagSql, org }) => {
       const { rows } = await query(
         `SELECT c.display_name AS customer,
                 COALESCE(SUM(d.balance * d.exchange_rate) FILTER (WHERE d.due_date >= CURRENT_DATE),0) AS current,
@@ -322,7 +327,7 @@ const REPORTS: any = {
                 COALESCE(SUM(d.balance * d.exchange_rate) FILTER (WHERE CURRENT_DATE - d.due_date > 45),0) AS d45_plus,
                 SUM(d.balance * d.exchange_rate) AS total
            FROM invoices d JOIN contacts c ON c.id = d.contact_id
-          WHERE d.org_id = $1 AND d.status IN ('sent','partially_paid') GROUP BY c.id ORDER BY total DESC`,
+          WHERE d.org_id = $1 ${tagSql('d')} AND d.status IN ('sent','partially_paid') GROUP BY c.id ORDER BY total DESC`,
         [org],
       );
       return {
@@ -353,14 +358,15 @@ const REPORTS: any = {
 
   // ---------------------------------------------------------------- purchases
   purchases_by_vendor: {
+    tagged: true,
     group: 'Purchases', title: 'Purchases by Vendor', dated: true, warehouse: false,
     description: 'Bills and purchase value per vendor.',
-    run: async ({ org, from, to }) => {
+    run: async ({ tagSql, org, from, to }) => {
       const { rows } = await query(
         `SELECT c.display_name AS vendor, COUNT(*)::int AS bills, SUM((d.sub_total - d.discount_total) * d.exchange_rate) AS amount, SUM(d.tax_total * d.exchange_rate) AS tax,
                 SUM(d.total * d.exchange_rate) AS total, SUM(d.balance * d.exchange_rate) AS balance
            FROM bills d JOIN contacts c ON c.id = d.contact_id
-          WHERE d.org_id = $1 AND d.status NOT IN ('draft','void') AND d.doc_date BETWEEN $2 AND $3
+          WHERE d.org_id = $1 ${tagSql('d')} AND d.status NOT IN ('draft','void') AND d.doc_date BETWEEN $2 AND $3
           GROUP BY c.id ORDER BY total DESC`,
         [org, from, to],
       );
@@ -373,14 +379,15 @@ const REPORTS: any = {
     },
   },
   purchases_by_item: {
+    tagged: true,
     group: 'Purchases', title: 'Purchases by Item', dated: true, warehouse: false,
     description: 'Quantity and value purchased per item (from bills).',
-    run: async ({ org, from, to }) => {
+    run: async ({ tagSql, org, from, to }) => {
       const { rows } = await query(
         `SELECT COALESCE(i.name, l.description) AS name, i.sku, SUM(l.quantity) AS quantity, SUM(l.amount * (1 - d.discount_percent / 100) * d.exchange_rate) AS amount,
                 CASE WHEN SUM(l.quantity) > 0 THEN SUM(l.amount * (1 - d.discount_percent / 100) * d.exchange_rate) / SUM(l.quantity) ELSE 0 END AS avg_cost
            FROM bill_lines l JOIN bills d ON d.id = l.doc_id LEFT JOIN items i ON i.id = l.item_id
-          WHERE d.org_id = $1 AND d.status NOT IN ('draft','void') AND d.doc_date BETWEEN $2 AND $3
+          WHERE d.org_id = $1 ${tagSql('d')} AND d.status NOT IN ('draft','void') AND d.doc_date BETWEEN $2 AND $3
           GROUP BY 1, 2 ORDER BY amount DESC`,
         [org, from, to],
       );
@@ -391,14 +398,15 @@ const REPORTS: any = {
     },
   },
   purchase_order_details: {
+    tagged: true,
     group: 'Purchases', title: 'Purchase Order Details', dated: true, warehouse: false,
     description: 'Ordered, received and billed quantities per purchase order.',
-    run: async ({ org, from, to }) => {
+    run: async ({ tagSql, org, from, to }) => {
       const { rows } = await query(
         `SELECT d.number, d.doc_date, c.display_name AS vendor, d.status, d.expected_delivery_date,
                 SUM(l.quantity) AS ordered, SUM(l.qty_received) AS received, SUM(l.qty_billed) AS billed, d.total
            FROM purchase_orders d JOIN contacts c ON c.id = d.contact_id JOIN purchase_order_lines l ON l.doc_id = d.id
-          WHERE d.org_id = $1 AND d.doc_date BETWEEN $2 AND $3
+          WHERE d.org_id = $1 ${tagSql('d')} AND d.doc_date BETWEEN $2 AND $3
           GROUP BY d.id, c.display_name ORDER BY d.doc_date DESC`,
         [org, from, to],
       );
@@ -411,9 +419,10 @@ const REPORTS: any = {
     },
   },
   vendor_balances: {
+    tagged: true,
     group: 'Payables', title: 'Vendor Balances (Payables Aging)', dated: false, warehouse: false,
     description: 'Outstanding bill balances per vendor, grouped by days overdue.',
-    run: async ({ org }) => {
+    run: async ({ tagSql, org }) => {
       const { rows } = await query(
         `SELECT c.display_name AS vendor,
                 COALESCE(SUM(d.balance * d.exchange_rate) FILTER (WHERE d.due_date >= CURRENT_DATE),0) AS current,
@@ -423,7 +432,7 @@ const REPORTS: any = {
                 COALESCE(SUM(d.balance * d.exchange_rate) FILTER (WHERE CURRENT_DATE - d.due_date > 45),0) AS d45_plus,
                 SUM(d.balance * d.exchange_rate) AS total
            FROM bills d JOIN contacts c ON c.id = d.contact_id
-          WHERE d.org_id = $1 AND d.status IN ('open','partially_paid') GROUP BY c.id ORDER BY total DESC`,
+          WHERE d.org_id = $1 ${tagSql('d')} AND d.status IN ('open','partially_paid') GROUP BY c.id ORDER BY total DESC`,
         [org],
       );
       return {
@@ -661,7 +670,7 @@ Object.assign(REPORTS, {
 Object.assign(REPORTS, EXTRA_REPORTS);
 
 r.get('/', can('reports', 'view'), (_req, res) => {
-  res.json(Object.entries(REPORTS).map(([key, x]: any) => ({ key, group: x.group, title: x.title, description: x.description, dated: x.dated, warehouse: x.warehouse })));
+  res.json(Object.entries(REPORTS).map(([key, x]: any) => ({ key, group: x.group, title: x.title, description: x.description, dated: x.dated, warehouse: x.warehouse, tagged: !!x.tagged })));
 });
 
 /** Run a report for an organization (used by the page and by scheduled emails). */
@@ -674,8 +683,19 @@ export async function runReport(orgId, key, opts: any = {}) {
   if (opts.to) to = String(opts.to).slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) throw badRequest('Invalid date range');
   const warehouse = opts.warehouse_id ? Number(opts.warehouse_id) : null;
-  const result = await rep.run({ org: orgId, from, to, warehouse, state: o.state || '' });
-  return { key, title: rep.title, description: rep.description, dated: rep.dated, warehouse: rep.warehouse, from, to, ...result };
+  // Reporting tag filters (?tag_<id>=<value>): only valid tags and values are used.
+  const filters = [];
+  if (rep.tagged) {
+    const { rows: tags } = await query('SELECT id, name, options FROM reporting_tags WHERE org_id = $1', [orgId]);
+    for (const [k, v] of Object.entries(opts)) {
+      const m = /^tag_(\d+)$/.exec(k);
+      const t = m && tags.find((x) => String(x.id) === m[1]);
+      if (t && v && (t.options || []).includes(String(v))) filters.push({ id: t.id, name: t.name, value: String(v) });
+    }
+  }
+  const tagSql = (alias) => filters.map((f) => ` AND ${alias}.tags->>'${Number(f.id)}' = '${f.value.replace(/'/g, "''")}'`).join('');
+  const result = await rep.run({ org: orgId, from, to, warehouse, state: o.state || '', tagSql });
+  return { key, title: rep.title, description: rep.description, dated: rep.dated, warehouse: rep.warehouse, tagged: !!rep.tagged, tag_filters: filters, from, to, ...result };
 }
 
 export const reportExists = (key) => !!REPORTS[String(key)];

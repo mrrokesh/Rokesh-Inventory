@@ -189,9 +189,10 @@ function ScheduleModal({ reportKey, title, dated, warehouse, onClose }: any) {
 export function ReportView() {
   const { key } = useParams();
   const [sp, setSp] = useSearchParams();
-  const { warehouses } = useLookups('warehouses');
+  const { warehouses, reportingTags } = useLookups('warehouses', 'reportingTags');
   const period = sp.get('period') || 'this_year';
-  const params = { period: period === 'custom' ? undefined : period, from: period === 'custom' ? sp.get('from') : undefined, to: period === 'custom' ? sp.get('to') : undefined, warehouse_id: sp.get('warehouse_id') || undefined };
+  const tagParams = Object.fromEntries([...sp.entries()].filter(([k, v]) => /^tag_\d+$/.test(k) && v));
+  const params = { period: period === 'custom' ? undefined : period, from: period === 'custom' ? sp.get('from') : undefined, to: period === 'custom' ? sp.get('to') : undefined, warehouse_id: sp.get('warehouse_id') || undefined, ...tagParams };
   const { data: rep, error, loading } = useApi(`/reports/${key}`, params);
   const fav = useFavourites();
   const [scheduling, setScheduling] = useState(false);
@@ -226,7 +227,10 @@ export function ReportView() {
         {rep?.warehouse && warehouses.length > 1 && (
           <div style={{ width: 220 }}><Select value={sp.get('warehouse_id') || ''} onChange={(v) => setParam('warehouse_id', v)} options={warehouses.map((w) => [w.id, w.name])} placeholder="All warehouses" /></div>
         )}
-        {rep && <span className="muted small">{rep.dated ? `${date(rep.from)} – ${date(rep.to)}` : `As of today`}</span>}
+        {rep?.tagged && (reportingTags?.tags || []).filter((t) => t.is_active).map((t) => (
+          <div key={t.id} style={{ width: 180 }}><Select value={sp.get(`tag_${t.id}`) || ''} onChange={(v) => setParam(`tag_${t.id}`, v)} options={(t.options || []).map((o) => [o, o])} placeholder={`All ${t.name}`} aria-label={t.name} /></div>
+        ))}
+        {rep && <span className="muted small">{rep.dated ? `${date(rep.from)} – ${date(rep.to)}` : `As of today`}{rep.tag_filters?.length ? ` · ${rep.tag_filters.map((f) => `${f.name}: ${f.value}`).join(', ')}` : ''}</span>}
       </div></div>
       <ErrorBox error={error} />
       {scheduling && rep && <ScheduleModal reportKey={key} title={rep.title} dated={rep.dated} warehouse={rep.warehouse} onClose={() => setScheduling(false)} />}
