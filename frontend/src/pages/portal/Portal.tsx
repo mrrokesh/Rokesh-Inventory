@@ -1,4 +1,4 @@
-﻿// Customer portal — what a customer sees at /portal/<org-slug>.
+﻿// Customer & vendor portal — what a customer or vendor sees at /portal/<org-slug>.
 import { useCallback, useEffect, useState } from 'react';
 import { Link, NavLink, Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import { addressLines, date, dateTime, label, modeLabel, money, qty, INDIAN_STATES } from '../../lib/format';
@@ -33,7 +33,7 @@ function Shell({ org, children }: any) {
             <img src={org?.logo_path ? mediaUrl(org.logo_path) : LOGO_SRC} alt="" />
             <div>
               <div className="auth-app-name">{org?.name || APP_NAME}</div>
-              <div className="auth-app-tag">Customer portal</div>
+              <div className="auth-app-tag">Customer &amp; vendor portal</div>
             </div>
           </div>
           {children}
@@ -62,7 +62,7 @@ function Login({ slug, org, onIn }: any) {
     <Shell org={org}>
       <form className="stack" onSubmit={submit}>
         <h1>Sign in</h1>
-        <p className="muted" style={{ marginTop: 0 }}>Sign in to see your orders, invoices and payments.</p>
+        <p className="muted" style={{ marginTop: 0 }}>Customers: see your orders, invoices and payments. Suppliers: see our purchase orders, your bills and payments.</p>
         <ErrorBox error={error} />
         <Field label="Email"><Input type="email" required autoFocus autoComplete="email" value={f.email} onChange={(v) => setF({ ...f, email: v })} /></Field>
         <Field label="Password"><Input type="password" required autoComplete="current-password" value={f.password} onChange={(v) => setF({ ...f, password: v })} /></Field>
@@ -100,7 +100,12 @@ function Invite({ slug, org, onIn }: any) {
   );
 }
 
-const KIND_LABEL = { invoices: 'Invoices', 'sales-orders': 'Orders', estimates: 'Quotes', 'credit-notes': 'Credit notes' };
+const KIND_LABEL = { invoices: 'Invoices', 'sales-orders': 'Orders', estimates: 'Quotes', 'credit-notes': 'Credit notes',
+  'purchase-orders': 'Purchase orders', bills: 'Bills', 'vendor-credits': 'Credits' };
+const CUSTOMER_KINDS = ['invoices', 'sales-orders', 'estimates', 'credit-notes'];
+const VENDOR_KINDS = ['purchase-orders', 'bills', 'vendor-credits'];
+const DOC_TITLE = { invoices: 'Invoice', 'sales-orders': 'Sales order', estimates: 'Estimate', 'credit-notes': 'Credit note', 'purchase-orders': 'Purchase order', bills: 'Bill', 'vendor-credits': 'Vendor credit' };
+const today = () => new Date().toISOString().slice(0, 10);
 
 function DocList({ call, slug, kind }: any) {
   const [rows, setRows] = useState(null);
@@ -111,13 +116,15 @@ function DocList({ call, slug, kind }: any) {
   if (!rows.length) return <EmptyState title={`No ${KIND_LABEL[kind].toLowerCase()} yet`} />;
   return (
     <div className="card"><table className="table">
-      <thead><tr><th>Number</th><th>Date</th>{kind === 'invoices' && <th>Due</th>}{kind === 'estimates' && <th>Valid until</th>}<th>Status</th><th className="num">Amount</th>{kind === 'invoices' && <th className="num">Balance</th>}</tr></thead>
+      <thead><tr><th>Number</th><th>Date</th>{['invoices', 'bills'].includes(kind) && <th>Due</th>}{kind === 'estimates' && <th>Valid until</th>}{kind === 'purchase-orders' && <th>Delivery by</th>}<th>Status</th><th className="num">Amount</th>{['invoices', 'bills'].includes(kind) && <th className="num">Balance</th>}</tr></thead>
       <tbody>{rows.map((d) => (
         <tr key={d.id}>
           <td><Link to={`/portal/${slug}/${kind}/${d.id}`} className="bold">{d.number}</Link></td><td>{date(d.doc_date)}</td>
-          {kind === 'invoices' && <td>{date(d.due_date)}</td>}{kind === 'estimates' && <td>{date(d.expiry_date) || '—'}</td>}
-          <td><Badge status={kind === 'invoices' && ['sent', 'partially_paid'].includes(d.status) && d.due_date < new Date().toISOString().slice(0, 10) ? 'overdue' : d.status === 'sent' && kind === 'invoices' ? 'unpaid' : d.status}>{d.status === 'sent' && kind === 'estimates' ? 'Awaiting your reply' : undefined}</Badge></td>
-          <td className="num">{money(d.total)}</td>{kind === 'invoices' && <td className="num">{money(d.balance)}</td>}
+          {['invoices', 'bills'].includes(kind) && <td>{date(d.due_date)}</td>}{kind === 'estimates' && <td>{date(d.expiry_date) || '—'}</td>}{kind === 'purchase-orders' && <td>{date(d.expected_delivery_date) || '—'}</td>}
+          <td>{kind === 'purchase-orders' && d.status === 'issued'
+            ? <Badge status={d.vendor_response || 'pending'}>{d.vendor_response ? undefined : 'Awaiting your reply'}</Badge>
+            : <Badge status={['invoices', 'bills'].includes(kind) && ['sent', 'open', 'partially_paid'].includes(d.status) && d.due_date < today() ? 'overdue' : ['sent', 'open'].includes(d.status) && ['invoices', 'bills'].includes(kind) ? 'unpaid' : d.status}>{d.status === 'sent' && kind === 'estimates' ? 'Awaiting your reply' : undefined}</Badge>}</td>
+          <td className="num">{money(d.total, { currency: d.currency })}</td>{['invoices', 'bills'].includes(kind) && <td className="num">{money(d.balance, { currency: d.currency })}</td>}
         </tr>
       ))}</tbody>
     </table></div>
@@ -131,10 +138,17 @@ function DocView({ call, slug, kind }: any) {
   const [error, setError] = useState(null);
   const [comment, setComment] = useState('');
   const [busy, setBusy] = useState(false);
+  const [answer, setAnswer] = useState({ expected_delivery_date: '', note: '' });
   const load = useCallback(() => call('GET', `/docs/${kind}/${id}`).then(setDoc).catch(setError), [call, kind, id]);
   useEffect(() => { load(); }, [load]);
   if (error) return <ErrorBox error={error} />;
   if (!doc) return <Spinner />;
+  const m = (v) => money(v, { currency: doc.currency });
+  const vendor = VENDOR_KINDS.includes(kind);
+  const answerPo = async (action) => {
+    setBusy(true);
+    try { await call('POST', `/docs/purchase-orders/${doc.id}/respond`, { action, ...answer }); toast(action === 'accept' ? 'Thank you — order accepted' : 'Order declined'); load(); } catch (e) { toast(e.message, 'error'); } finally { setBusy(false); }
+  };
   const respond = async (action) => {
     setBusy(true);
     try { await call('POST', `/docs/estimates/${doc.id}/respond`, { action }); toast(action === 'accept' ? 'Thank you — quote accepted' : 'Quote declined'); load(); } catch (e) { toast(e.message, 'error'); } finally { setBusy(false); }
@@ -162,46 +176,62 @@ function DocView({ call, slug, kind }: any) {
         <span className="spacer" />
         {kind === 'estimates' && ['sent', 'declined'].includes(doc.status) && <button type="button" className="btn primary" disabled={busy} onClick={() => respond('accept')}>Accept quote</button>}
         {kind === 'estimates' && ['sent', 'accepted'].includes(doc.status) && <button type="button" className="btn" disabled={busy} onClick={() => respond('decline')}>Decline</button>}
-        {doc.can_pay_online && <button type="button" className="btn primary" disabled={busy} onClick={pay}>{busy ? 'Opening…' : `Pay ${money(doc.balance)} online`}</button>}
+        {doc.can_pay_online && <button type="button" className="btn primary" disabled={busy} onClick={pay}>{busy ? 'Opening…' : `Pay ${m(doc.balance)} online`}</button>}
         <button type="button" className="btn" onClick={() => window.print()}>Print / PDF</button>
       </div>
+      {kind === 'purchase-orders' && doc.status === 'issued' && (
+        <div className="card no-print"><div className="card-body stack">
+          {doc.vendor_response
+            ? <div>You <b>{doc.vendor_response}</b> this order on {dateTime(doc.vendor_response_at)}.{doc.vendor_response_note && <> Your note: “{doc.vendor_response_note}”</>} You can change your answer below.</div>
+            : <div className="bold">Please confirm whether you can supply this order.</div>}
+          <div className="grid-2">
+            <Field label="Delivery date you can meet" hint="Optional — leave empty to keep the date we asked for."><Input type="date" value={answer.expected_delivery_date} onChange={(v) => setAnswer({ ...answer, expected_delivery_date: v })} /></Field>
+            <Field label="Note to us (optional)"><Input value={answer.note} onChange={(v) => setAnswer({ ...answer, note: v })} placeholder="e.g. 2 items will come in a second lot" /></Field>
+          </div>
+          <div className="row">
+            <button type="button" className="btn primary" disabled={busy} onClick={() => answerPo('accept')}>Accept order</button>
+            <button type="button" className="btn" disabled={busy} onClick={() => answerPo('decline')}>Can't supply</button>
+          </div>
+        </div></div>
+      )}
       <div className="doc-paper">
         <div className="row" style={{ alignItems: 'flex-start' }}>
-          <div><div className="doc-title">{label(kind === 'sales-orders' ? 'sales_order' : kind === 'credit-notes' ? 'credit_note' : kind.replace(/s$/, ''))}</div><div className="bold"># {doc.number}</div></div>
+          <div><div className="doc-title">{DOC_TITLE[kind]}</div><div className="bold"># {doc.number}</div></div>
           <span className="spacer" />
-          <div className="right"><Badge status={doc.status} />{kind === 'invoices' && doc.status !== 'paid' && <div className="mt"><div className="small muted">Balance due</div><div className="bold" style={{ fontSize: 20 }}>{money(doc.balance)}</div></div>}</div>
+          <div className="right"><Badge status={doc.status} />{['invoices', 'bills'].includes(kind) && doc.status !== 'paid' && <div className="mt"><div className="small muted">{kind === 'bills' ? 'Balance to be paid to you' : 'Balance due'}</div><div className="bold" style={{ fontSize: 20 }}>{m(doc.balance)}</div></div>}</div>
         </div>
         <div className="grid-2 mt">
-          <div><div className="small muted">Bill to</div><div className="bold">{doc.contact_name}</div>{addressLines(doc.billing_address).map((l) => <div key={l} className="small">{l}</div>)}</div>
+          <div><div className="small muted">{vendor ? 'Supplier' : 'Bill to'}</div><div className="bold">{doc.contact_name}</div>{addressLines(doc.billing_address).map((l) => <div key={l} className="small">{l}</div>)}</div>
           <dl className="kv">
             <dt>Date</dt><dd>{date(doc.doc_date)}</dd>
             {doc.due_date && <><dt>Due date</dt><dd>{date(doc.due_date)}</dd></>}
             {doc.expiry_date && <><dt>Valid until</dt><dd>{date(doc.expiry_date)}</dd></>}
             {doc.reference && <><dt>Reference</dt><dd>{doc.reference}</dd></>}
             {doc.place_of_supply && <><dt>Place of supply</dt><dd>{doc.place_of_supply}</dd></>}
+            {doc.expected_delivery_date && <><dt>Deliver by</dt><dd>{date(doc.expected_delivery_date)}</dd></>}
           </dl>
         </div>
         <table className="table mt">
           <thead><tr><th>Item</th><th className="num">Qty</th><th className="num">Rate</th><th className="num">Amount</th></tr></thead>
           <tbody>{doc.lines.map((l) => (
             <tr key={l.id}><td>{l.item_name || l.description}{l.item_name && l.description && <div className="small muted">{l.description}</div>}</td>
-              <td className="num">{qty(l.quantity)} {l.item_unit || ''}</td><td className="num">{money(l.rate)}</td><td className="num">{money(l.amount)}</td></tr>
+              <td className="num">{qty(l.quantity)} {l.item_unit || ''}</td><td className="num">{m(l.rate)}</td><td className="num">{m(l.amount)}</td></tr>
           ))}</tbody>
         </table>
         <div className="totals mt" style={{ background: 'none' }}>
-          <div className="t-row"><span>Sub total</span><span>{money(doc.sub_total)}</span></div>
-          {doc.discount_total > 0 && <div className="t-row"><span>Discount</span><span>-{money(doc.discount_total)}</span></div>}
-          {[...taxes.entries()].map(([k, v]) => <div className="t-row" key={k}><span>{k}</span><span>{money(v)}</span></div>)}
-          {doc.shipping_charge > 0 && <div className="t-row"><span>Shipping</span><span>{money(doc.shipping_charge)}</span></div>}
-          {doc.adjustment !== 0 && <div className="t-row"><span>Adjustment</span><span>{money(doc.adjustment)}</span></div>}
-          <div className="t-row grand"><span>Total</span><span>{money(doc.total)}</span></div>
+          <div className="t-row"><span>Sub total</span><span>{m(doc.sub_total)}</span></div>
+          {doc.discount_total > 0 && <div className="t-row"><span>Discount</span><span>-{m(doc.discount_total)}</span></div>}
+          {[...taxes.entries()].map(([k, v]) => <div className="t-row" key={k}><span>{k}</span><span>{m(v)}</span></div>)}
+          {doc.shipping_charge > 0 && <div className="t-row"><span>Shipping</span><span>{m(doc.shipping_charge)}</span></div>}
+          {doc.adjustment !== 0 && <div className="t-row"><span>Adjustment</span><span>{m(doc.adjustment)}</span></div>}
+          <div className="t-row grand"><span>Total</span><span>{m(doc.total)}</span></div>
         </div>
         {doc.notes && <p style={{ whiteSpace: 'pre-wrap' }}>{doc.notes}</p>}
         {doc.terms && <p className="small muted" style={{ whiteSpace: 'pre-wrap' }}>{doc.terms}</p>}
       </div>
       {doc.payments?.length > 0 && (
         <div className="card"><div className="card-head"><h3>Payments</h3></div><table className="table compact"><tbody>
-          {doc.payments.map((p) => <tr key={p.number}><td>{p.number}</td><td>{date(p.payment_date)}</td><td>{modeLabel(p.mode)}</td><td className="num">{money(p.amount)}</td></tr>)}
+          {doc.payments.map((p) => <tr key={p.number}><td>{p.number}</td><td>{date(p.payment_date)}</td><td>{modeLabel(p.mode)}</td><td className="num">{m(p.amount)}</td></tr>)}
         </tbody></table></div>
       )}
       <div className="card no-print">
@@ -223,6 +253,23 @@ function DocView({ call, slug, kind }: any) {
 
 function Home({ me, slug }: any) {
   const c = me.contact;
+  const m = (v) => money(v, { currency: c.currency });
+  if (c.contact_type === 'vendor') {
+    return (
+      <div className="stack">
+        <h2>Hello, {c.display_name}</h2>
+        <div className="grid-4">
+          <Link to={`/portal/${slug}/bills`} className="card stat" style={{ color: 'var(--text)' }}><div className="label">To be paid to you</div><div className="value sm">{m(me.payable)}</div>{Number(me.overdue) > 0 && <div className="small w-alert">{m(me.overdue)} past due date</div>}</Link>
+          <Link to={`/portal/${slug}/purchase-orders`} className="card stat" style={{ color: 'var(--text)' }}><div className="label">Open purchase orders</div><div className="value sm">{me.open_orders}</div></Link>
+          <Link to={`/portal/${slug}/purchase-orders`} className="card stat" style={{ color: 'var(--text)' }}><div className="label">Waiting for your reply</div><div className="value sm">{me.awaiting_reply}</div></Link>
+          <Link to={`/portal/${slug}/vendor-credits`} className="card stat" style={{ color: 'var(--text)' }}><div className="label">Credits with you</div><div className="value sm">{m(me.credits)}</div></Link>
+        </div>
+        <div className="card"><div className="card-body small muted">
+          Questions? Contact {me.org.name}{me.org.email ? ` at ${me.org.email}` : ''}{me.org.phone ? ` or ${me.org.phone}` : ''}. You can also write a message on any purchase order or bill.
+        </div></div>
+      </div>
+    );
+  }
   return (
     <div className="stack">
       <h2>Hello, {c.display_name}</h2>
@@ -244,8 +291,8 @@ function Payments({ call }: any) {
   useEffect(() => { call('GET', '/payments').then(setRows).catch(() => setRows([])); }, [call]);
   if (!rows) return <Spinner />;
   if (!rows.length) return <EmptyState title="No payments yet" />;
-  return <div className="card"><table className="table"><thead><tr><th>Date</th><th>Receipt#</th><th>Mode</th><th>For invoices</th><th className="num">Amount</th></tr></thead>
-    <tbody>{rows.map((p) => <tr key={p.id}><td>{date(p.payment_date)}</td><td>{p.number}</td><td>{modeLabel(p.mode)}</td><td>{p.invoices}</td><td className="num">{money(p.amount)}</td></tr>)}</tbody></table></div>;
+  return <div className="card"><table className="table"><thead><tr><th>Date</th><th>Receipt#</th><th>Mode</th><th>For invoices / bills</th><th className="num">Amount</th></tr></thead>
+    <tbody>{rows.map((p) => <tr key={p.id}><td>{date(p.payment_date)}</td><td>{p.number}</td><td>{modeLabel(p.mode)}</td><td>{p.invoices}</td><td className="num">{money(p.amount, { currency: p.currency })}</td></tr>)}</tbody></table></div>;
 }
 
 function Shipments({ call }: any) {
@@ -320,7 +367,7 @@ export default function Portal() {
   const loadMe = useCallback(() => call('GET', '/me').then(setMe).catch(() => {}), [call]);
   useEffect(() => { fetch(`${API_BASE}/api/portal/${slug}/info`).then((r) => (r.ok ? r.json() : Promise.reject(new Error('This portal link is not valid')))).then(setOrg).catch(setError); }, [slug]);
   useEffect(() => { if (signedIn) loadMe(); }, [signedIn, loadMe]);
-  useEffect(() => { document.title = org ? `${org.name} – Customer portal` : 'Customer portal'; }, [org]);
+  useEffect(() => { document.title = org ? `${org.name} – ${me?.contact?.contact_type === 'vendor' ? 'Vendor' : 'Customer'} portal` : 'Portal'; }, [org, me]);
 
   if (error) return <Shell><ErrorBox error={error} /></Shell>;
   return (
@@ -332,7 +379,9 @@ export default function Portal() {
             {me.org.logo_path && <img src={mediaUrl(me.org.logo_path)} alt="" style={{ height: 32 }} />}
             <strong>{me.org.name}</strong>
             <nav className="row wrap" style={{ gap: 4, marginLeft: 16 }}>
-              {[['', 'Home'], ['invoices', 'Invoices'], ['sales-orders', 'Orders'], ['estimates', 'Quotes'], ['shipments', 'Shipments'], ['payments', 'Payments'], ['statement', 'Statement'], ['profile', 'My details']].map(([p, l]) => (
+              {(me.contact.contact_type === 'vendor'
+                ? [['', 'Home'], ['purchase-orders', 'Purchase orders'], ['bills', 'Bills'], ['vendor-credits', 'Credits'], ['payments', 'Payments'], ['statement', 'Statement'], ['profile', 'My details']]
+                : [['', 'Home'], ['invoices', 'Invoices'], ['sales-orders', 'Orders'], ['estimates', 'Quotes'], ['shipments', 'Shipments'], ['payments', 'Payments'], ['statement', 'Statement'], ['profile', 'My details']]).map(([p, l]) => (
                 <NavLink key={p} end={p === ''} to={`/portal/${slug}${p ? `/${p}` : ''}`} className={({ isActive }) => `btn sm ${isActive ? 'primary' : 'ghost'}`}>{l}</NavLink>
               ))}
             </nav>
@@ -343,7 +392,7 @@ export default function Portal() {
           <main className="page" style={{ margin: '0 auto' }}>
             <Routes>
               <Route index element={<Home me={me} slug={slug} />} />
-              {Object.keys(KIND_LABEL).map((k) => [
+              {(me.contact.contact_type === 'vendor' ? VENDOR_KINDS : CUSTOMER_KINDS).map((k) => [
                 <Route key={k} path={k} element={<div className="stack"><h2>{KIND_LABEL[k]}</h2><DocList call={call} slug={slug} kind={k} /></div>} />,
                 <Route key={`${k}-d`} path={`${k}/:id`} element={<DocView call={call} slug={slug} kind={k} />} />,
               ])}

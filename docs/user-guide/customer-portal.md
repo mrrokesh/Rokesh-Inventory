@@ -45,3 +45,18 @@ When a customer writes a message, it appears in the **Comments** box on that doc
 - Update their **phone number and addresses** (name, email and GSTIN can only be changed by you).
 - Change their own password.
 - **Print or save a PDF** of any invoice or statement.
+
+## Vendor portal: your suppliers online
+
+Suppliers can use the same portal address. On a vendor, open the **Vendor portal** card and press **Invite to portal**. The vendor gets an email (or you copy the link) to choose a password.
+
+Once signed in, a vendor sees:
+- **Purchase orders** you've issued to them. For each one they can **Accept order** or say **Can't supply**, confirm the **delivery date** they can meet, and add a note. Their answer shows on the purchase order as **Vendor's answer**, and a new delivery date updates the order.
+- **Bills** with what you still have to pay them, and the payments against each bill.
+- **Credits** (vendor credits) and all **payments** you've made to them.
+- A **statement** of bills, payments and credits with a running balance.
+- A message box on every purchase order and bill. Messages appear in the document's comments for your team.
+
+If one person is both your customer and your supplier with the same email, they get two separate portal accounts. The password they chose for each invitation decides which one they sign in to.
+
+Turn access off at any time from the same card.

@@ -104,6 +104,9 @@ export function DocPaper({ cfg, doc, org, template = null, preview = false }: an
           {doc.bill_number && <><dt>Bill</dt><dd><DocLink preview={preview} to={`/bills/${doc.bill_id}`}>{doc.bill_number}</DocLink></dd></>}
           {doc.warehouse_name && <><dt>Warehouse</dt><dd>{doc.warehouse_name}</dd></>}
           {cfg.key === 'vendor_credits' && <><dt>Goods returned</dt><dd>{doc.return_stock ? 'Yes' : 'No'}</dd></>}
+          {!preview && doc.vendor_response && <><dt className="no-print">Vendor's answer</dt><dd className="no-print"><Badge status={doc.vendor_response} />
+            <span className="small faint"> {new Date(doc.vendor_response_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+            {doc.vendor_response_note && <div className="small" style={{ whiteSpace: 'pre-wrap' }}>“{doc.vendor_response_note}”</div>}</dd></>}
           {t.show_custom_fields && <CustomFieldValues entity={cfg.entity} values={doc.custom_fields} pdf />}
           {!preview && <TagValues module={cfg.entity} values={doc.tags} />}
           {doc.currency && doc.currency !== baseCurrency() && <><dt>Currency</dt><dd>{doc.currency} <span className="small faint">(1 {doc.currency} = {Number(doc.exchange_rate)} {baseCurrency()})</span></dd></>}

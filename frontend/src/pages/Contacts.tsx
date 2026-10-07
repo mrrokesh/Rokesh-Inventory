@@ -264,32 +264,35 @@ function ContactTransactions({ type, contactId }: any) {
 }
 const r0Balance = (p) => ['/invoices', '/bills', '/credit-notes', '/vendor-credits'].includes(p);
 
-function PortalCard({ contact, onChange }: any) {
+function PortalCard({ contact, onChange, type = 'customer' }: any) {
   const { can } = useAuth();
+  const base = type === 'vendor' ? '/vendors' : '/customers';
   const toast = useToast();
   const [busy, run] = useAction(toast);
   const [link, setLink] = useState(null);
   const enable = async () => {
-    const r = await run(() => api.post(`/customers/${contact.id}/portal`, { enable: true }));
+    const r = await run(() => api.post(`${base}/${contact.id}/portal`, { enable: true }));
     if (!r) return;
     const url = `${window.location.origin}${r.path}`;
     setLink(url);
     try { await navigator.clipboard.writeText(url); } catch { /* shown below */ }
-    toast(r.emailed ? `Invitation emailed to ${r.email}` : 'Invitation link copied — send it to the customer');
+    toast(r.emailed ? `Invitation emailed to ${r.email}` : `Invitation link copied — send it to the ${type}`);
     onChange();
   };
   const disable = async () => {
     if (!(await confirmDialog({ message: `Turn off portal access for ${contact.display_name}? They will no longer be able to sign in.`, confirmText: 'Turn off' }))) return;
-    if (await run(() => api.post(`/customers/${contact.id}/portal`, { enable: false }), 'Portal access turned off')) { setLink(null); onChange(); }
+    if (await run(() => api.post(`${base}/${contact.id}/portal`, { enable: false }), 'Portal access turned off')) { setLink(null); onChange(); }
   };
   return (
     <div className="card">
-      <div className="card-head"><h3>Customer portal</h3><Badge status={contact.portal_enabled ? 'active' : 'inactive'}>{contact.portal_enabled ? (contact.portal_last_login ? 'Active' : 'Invited') : 'Off'}</Badge></div>
+      <div className="card-head"><h3>{type === 'vendor' ? 'Vendor portal' : 'Customer portal'}</h3><Badge status={contact.portal_enabled ? 'active' : 'inactive'}>{contact.portal_enabled ? (contact.portal_last_login ? 'Active' : 'Invited') : 'Off'}</Badge></div>
       <div className="card-body small stack" style={{ gap: 8 }}>
-        <div className="muted">The customer can sign in to see their orders, invoices, payments and shipments, accept estimates, comment and pay online.</div>
+        <div className="muted">{type === 'vendor'
+          ? 'The vendor can sign in to see your purchase orders, accept or decline them and confirm delivery dates, follow their bills and payments, and send you messages.'
+          : 'The customer can sign in to see their orders, invoices, payments and shipments, accept estimates, comment and pay online.'}</div>
         {contact.portal_last_login && <div>Last signed in {dateTime(contact.portal_last_login)}</div>}
         {link && <div className="info-box" style={{ wordBreak: 'break-all' }}>Invitation link: <a href={link} target="_blank" rel="noreferrer">{link}</a></div>}
-        {can('customers', 'edit') && (
+        {can(type === 'vendor' ? 'vendors' : 'customers', 'edit') && (
           <div className="row">
             <button type="button" className="btn sm primary" disabled={busy} onClick={enable}>{contact.portal_enabled ? 'Send a new invitation link' : 'Invite to portal'}</button>
             {contact.portal_enabled && <button type="button" className="btn sm danger" disabled={busy} onClick={disable}>Turn off</button>}
@@ -384,7 +387,7 @@ export function ContactDetail({ type }: any) {
               <div className="card stat"><div className="label">Unused credits</div><div className="value sm">{money(d.unused_credits)}</div></div>
             </div>
             {type === 'customer' && d.credit_limit && Number(outstanding) > Number(d.credit_limit) && <div className="warn-box">Outstanding receivables exceed the credit limit of {money(d.credit_limit)}.</div>}
-            {type === 'customer' && <PortalCard contact={d} onChange={reload} />}
+            <PortalCard contact={d} onChange={reload} type={type} />
             <Attachments entityType={type} entityId={d.id} />
           </div>
         </div>
