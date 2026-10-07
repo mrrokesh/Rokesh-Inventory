@@ -19,7 +19,7 @@ export async function isEmailConfigured(orgId) {
 
 /** Send one email. Throws a friendly error when SMTP is not set up or the server rejects it. */
 export async function sendMail(orgId: any, opts: any) {
-  const { to, cc, subject, html, text, replyTo } = opts || {};
+  const { to, cc, subject, html, text, replyTo, attachments } = opts || {};
   const s = await smtpSettings(orgId);
   if (!s) throw badRequest('Email is not set up yet. An administrator can add the email account in Settings → Email.');
   const transport = nodemailer.createTransport({
@@ -30,7 +30,7 @@ export async function sendMail(orgId: any, opts: any) {
   try {
     return await transport.sendMail({
       from: { name: s.from_name || s.org_name, address: s.from_email || s.user },
-      to, cc: cc || undefined, subject, html, text, replyTo: replyTo || undefined,
+      to, cc: cc || undefined, subject, html, text, replyTo: replyTo || undefined, attachments: attachments || undefined,
     });
   } catch (err) {
     throw badRequest(`The email server rejected the message: ${err.message}`);

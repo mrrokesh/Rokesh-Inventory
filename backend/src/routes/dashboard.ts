@@ -13,6 +13,8 @@ export function periodRange(period, fyStart = 4) {
   const end = iso(now);
   switch (period) {
     case 'today': return { from: end, to: end };
+    case 'yesterday': { const d = new Date(now); d.setDate(d.getDate() - 1); return { from: iso(d), to: iso(d) }; }
+    case 'last_week': { const d = new Date(now); d.setDate(d.getDate() - ((d.getDay() + 6) % 7) - 7); const e = new Date(d); e.setDate(e.getDate() + 6); return { from: iso(d), to: iso(e) }; }
     case 'this_week': { const d = new Date(now); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return { from: iso(d), to: end }; }
     case 'this_month': return { from: iso(new Date(y, m, 1)), to: end };
     case 'last_month': return { from: iso(new Date(y, m - 1, 1)), to: iso(new Date(y, m, 0)) };

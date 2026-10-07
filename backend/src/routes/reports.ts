@@ -4,6 +4,8 @@ import { can } from '../middleware/auth.js';
 import { badRequest } from '../lib/errors.js';
 import { round2 } from '../lib/validate.js';
 import { periodRange } from './dashboard.js';
+import { EXTRA_REPORTS } from './reportsExtra.js';
+import { reportExtrasRouter } from './reportSchedules.js';
 
 const r = Router();
 
@@ -653,21 +655,33 @@ Object.assign(REPORTS, {
   },
 });
 
+Object.assign(REPORTS, EXTRA_REPORTS);
+
 r.get('/', can('reports', 'view'), (_req, res) => {
   res.json(Object.entries(REPORTS).map(([key, x]: any) => ({ key, group: x.group, title: x.title, description: x.description, dated: x.dated, warehouse: x.warehouse })));
 });
 
-r.get('/:key', can('reports', 'view'), async (req, res) => {
-  const rep = REPORTS[String(req.params.key)];
+/** Run a report for an organization (used by the page and by scheduled emails). */
+export async function runReport(orgId, key, opts: any = {}) {
+  const rep = REPORTS[String(key)];
   if (!rep) throw badRequest('Unknown report');
-  const { rows: [o] } = await query('SELECT fiscal_year_start, state FROM organizations WHERE id = $1', [req.orgId]);
-  let { from, to } = periodRange(req.query.period || 'this_year', o.fiscal_year_start);
-  if (req.query.from) from = String(req.query.from).slice(0, 10);
-  if (req.query.to) to = String(req.query.to).slice(0, 10);
+  const { rows: [o] } = await query('SELECT fiscal_year_start, state FROM organizations WHERE id = $1', [orgId]);
+  let { from, to } = periodRange(opts.period || 'this_year', o.fiscal_year_start);
+  if (opts.from) from = String(opts.from).slice(0, 10);
+  if (opts.to) to = String(opts.to).slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) throw badRequest('Invalid date range');
-  const warehouse = req.query.warehouse_id ? Number(req.query.warehouse_id) : null;
-  const result = await rep.run({ org: req.orgId, from, to, warehouse, state: o.state || '' });
-  res.json({ key: req.params.key, title: rep.title, description: rep.description, dated: rep.dated, warehouse: rep.warehouse, from, to, ...result });
+  const warehouse = opts.warehouse_id ? Number(opts.warehouse_id) : null;
+  const result = await rep.run({ org: orgId, from, to, warehouse, state: o.state || '' });
+  return { key, title: rep.title, description: rep.description, dated: rep.dated, warehouse: rep.warehouse, from, to, ...result };
+}
+
+export const reportExists = (key) => !!REPORTS[String(key)];
+
+// Favourites and schedules come before /:key so their paths are not taken as report keys.
+r.use(reportExtrasRouter);
+
+r.get('/:key', can('reports', 'view'), async (req, res) => {
+  res.json(await runReport(req.orgId, req.params.key, req.query));
 });
 
 export default r;

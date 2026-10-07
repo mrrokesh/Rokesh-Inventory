@@ -31,6 +31,7 @@ import commentRoutes from './routes/comments.js';
 import workflowRoutes from './routes/workflows.js';
 import landedCostRoutes from './routes/landedCosts.js';
 import { startWorkflowWorkers } from './lib/workflows.js';
+import { startReportScheduler } from './routes/reportSchedules.js';
 import portalRoutes, { portalAdmin } from './routes/portal.js';
 import platformRoutes from './routes/platform.js';
 import { handleRazorpayWebhook, startIntegrationScheduler } from './lib/integrations.js';
@@ -130,6 +131,7 @@ migrate()
     app.listen(config.port, () => console.log(`Inventory API listening on http://localhost:${config.port}`));
     startWebhookWorker();
     startWorkflowWorkers();
+    startReportScheduler();
     startIntegrationScheduler();
   })
   .catch((err) => {

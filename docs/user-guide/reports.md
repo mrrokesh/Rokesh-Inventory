@@ -28,6 +28,42 @@ Go to **Reports** in the left menu. Each report answers one question. Pick a per
 | Payments I made | **Payments Made** |
 | Tax collected and paid | **Tax Summary** |
 | Whether I made a profit | **Profit and Loss Summary** |
+| Sales day by day (or month by month) | **Sales Summary** |
+| Which product categories earn the most | **Sales by Category** |
+| How much comes from Shopify vs. direct sales | **Sales by Channel** |
+| A list of every invoice / sales order / estimate / challan / credit note | **Invoice Details**, **Sales Order Details**, **Estimate Details**, **Delivery Challan Details**, **Credit Note Details** |
+| What customers returned, and refunds paid | **Sales Return History**, **Refund History** |
+| What was packed and shipped, with tracking numbers | **Packing History**, **Shipment Details**, **Shipped Quantity by Item** |
+| Which sales orders are holding (reserving) my stock | **Committed Stock Details** |
+| How fast each item sells | **Inventory Turnover** |
+| Why stock was adjusted (damaged, lost, stocktake…) | **Inventory Adjustment Summary** / **Details** |
+| Stock moved between warehouses | **Transfer Order History** |
+| Freight and duty added to stock cost | **Landed Cost Summary** |
+| What arrived from vendors | **Receive History**, **Received Quantity by Item** |
+| Purchase orders still waiting for goods | **Open Purchase Orders** |
+| Purchase orders per vendor, purchases per category | **Purchase Orders by Vendor**, **Purchases by Category** |
+| Every bill / vendor credit | **Bill Details**, **Vendor Credit Details** |
+| Emails the app sent, and failures | **Emails Sent** |
+| How often automatic rules ran | **Workflow Rule Runs** |
+| What Razorpay / Shiprocket / Shopify did | **Integration Activity** |
+| Which API keys exist and when they were used | **API Keys** |
+
+In the "Details" and "History" reports, **click a number** (invoice#, order#, item, customer) to open that record.
+
+## Favourite reports
+
+Click the **☆ star** next to a report, on the Reports page or at the top of an open report. Favourites are listed at the top of the Reports page, so the ones you use every day are one click away. Each user has their own favourites.
+
+## Get a report by email automatically (scheduled reports)
+
+1. Open the report and press **Schedule**, then **+ New schedule**.
+2. Choose **how often** (every day, a day of the week, or a day of the month) and **at what time**.
+3. Choose the **report period**: for example *Yesterday* for a daily sales email, *Last week* for a Monday summary, or *Last month* for a monthly one.
+4. Type the **email addresses** to send to, and press **Save schedule**.
+
+Each email shows the report as a table (up to 100 rows) and attaches the **full report as a spreadsheet file (CSV)** that opens in Excel. Use **Send now** to try it straight away, **Pause** to stop for a while, or **Remove** to stop for good. The **Scheduled reports** box on the Reports page lists all schedules and whether the last email went out.
+
+> Email must be set up first, under **Settings → Email**. If a send fails, the reason is shown next to the schedule and in the **Emails Sent** report.
 
 ## Understanding the profit report
 
