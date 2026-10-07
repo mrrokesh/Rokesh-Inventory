@@ -49,3 +49,17 @@ For Tally, Zapier, Make, n8n or your own website, a developer can use **Settings
 
 - An **API key** lets another program read and create records here, with the permissions of the user it acts as.
 - A **webhook** sends a message to another program the moment something happens (an invoice is sent, a payment arrives, stock is adjusted…).
+
+## Text messages (SMS)
+
+Send SMS to customers and vendors: by hand from any document, or automatically with workflow rules (for example *"Hi {{contact_name}}, invoice {{number}} for {{total}} is due on {{due_date}}"*).
+
+Connect one SMS service under **Settings → Integrations**:
+
+- **Twilio** works in most countries and is the easiest to set up. Enter the Account SID, Auth Token and your Twilio phone number, tick **Enabled**, **Save** and **Test connection**.
+- **MSG91** is for India. Indian rules (DLT) say every SMS must follow a template registered in advance. Register a template with one variable for the text (for example *"{#var#} - Your Company"*), add it in MSG91 as a flow, then enter your Auth Key and the template ID here. Your message is placed inside the template.
+
+Then:
+- **By hand:** open an invoice, order or bill, choose **More → Send SMS**. The contact's mobile number and a short message are filled in for you. 10-digit Indian numbers get +91 automatically.
+- **Automatically:** in a workflow rule, add the action **Send an SMS**.
+- **Check what went out:** **Reports → SMS Sent** lists every message, who sent it, and why any failed. Each message is charged by your SMS provider, not by this app.

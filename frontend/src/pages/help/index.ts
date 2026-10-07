@@ -24,7 +24,7 @@ export const ARTICLES = [
   { slug: 'customization', group: 'Admin', description: 'Custom fields, PDF templates, branding, reporting tags and MSME vendors.', routes: ['/settings/custom-fields', '/settings/templates', '/settings/branding', '/settings/reporting-tags'] },
   { slug: 'workflows', group: 'Admin', description: 'Automatic emails, tasks, webhooks and field updates.', routes: ['/settings/workflows'] },
   { slug: 'customer-portal', group: 'Admin', description: 'Let customers and suppliers see their documents online.', routes: [] },
-  { slug: 'email-integrations', group: 'Admin', description: 'Email documents, online payments, Shiprocket, Shopify and APIs.', routes: ['/settings/email', '/settings/integrations', '/settings/developer'] },
+  { slug: 'email-integrations', group: 'Admin', description: 'Email and SMS, online payments, Shiprocket, Shopify and APIs.', routes: ['/settings/email', '/settings/integrations', '/settings/developer'] },
   { slug: 'faq', group: 'Admin', description: 'Answers to common problems and error messages.', routes: [] },
 ].map((a) => {
   const text = raw[a.slug] || `# ${a.slug}\n\nThis guide is missing.`;

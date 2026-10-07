@@ -5,7 +5,7 @@ import { dateTime } from '../lib/format';
 import { Badge, Checkbox, ErrorBox, Field, Input, PageHead, Select, Spinner, Tabs, Textarea, confirmDialog, useAction, useApi } from '../components/ui';
 import { useToast } from '../components/Toast';
 
-const ACTION_LABELS = { email: 'Send an email', webhook: 'Call a webhook', field_update: 'Update a field', task: 'Create a task' };
+const ACTION_LABELS = { email: 'Send an email', sms: 'Send an SMS', webhook: 'Call a webhook', field_update: 'Update a field', task: 'Create a task' };
 const OPS_BY_TYPE = {
   text: ['equals', 'not_equals', 'contains', 'not_contains', 'starts_with', 'is_empty', 'is_not_empty'],
   select: ['equals', 'not_equals', 'is_empty', 'is_not_empty'],
@@ -21,6 +21,7 @@ const DATE_OP_TEXT = { equals: 'is on', gt: 'is after', gte: 'is on or after', l
 
 const NEW_ACTION = {
   email: { type: 'email', to_contact: true, to_creator: false, emails: '', subject: '', message: '', include_document: true },
+  sms: { type: 'sms', to_contact: true, numbers: '', message: '' },
   webhook: { type: 'webhook', url: '', secret: '' },
   field_update: { type: 'field_update', field: '', value: '' },
   task: { type: 'task', title: '', description: '', assignee_id: '', due_in_days: 1, priority: 'normal' },
@@ -92,6 +93,15 @@ function ActionCard({ a, m, users, onChange, onRemove, index }: any) {
           <Field label="Subject" required><Input value={a.subject} onChange={set('subject')} placeholder="e.g. Reminder: invoice {{number}} is overdue" /></Field>
           <Field label="Message"><Textarea rows={4} value={a.message} onChange={set('message')} placeholder={'Dear {{contact_name}},\n\nThis is a reminder that {{number}} for {{total}} was due on {{due_date}}.'} /></Field>
           {m.document && <Checkbox checked={a.include_document} onChange={set('include_document')}>Include the document (items and totals) in the email</Checkbox>}
+        </>
+      )}
+      {a.type === 'sms' && (
+        <>
+          {m.contact && <Checkbox checked={a.to_contact} onChange={set('to_contact')}>{m.contact === 'self' ? "This contact's mobile number" : `The ${m.contact}'s mobile number`}</Checkbox>}
+          <Field label="Other mobile numbers" hint="Separate several with commas, e.g. your sales manager."><Input value={a.numbers} onChange={set('numbers')} /></Field>
+          <Field label="Message" required hint={`Keep it short (${(a.message || '').length} characters). On MSG91 it is sent inside your DLT template. Needs Twilio or MSG91 under Settings → Integrations.`}>
+            <Textarea rows={3} value={a.message} onChange={set('message')} placeholder="Hi {{contact_name}}, invoice {{number}} for {{total}} is due on {{due_date}}." />
+          </Field>
         </>
       )}
       {a.type === 'webhook' && (
@@ -205,7 +215,7 @@ function RuleEditor({ meta, rule, onDone }: any) {
       <div className="row mb" style={{ gap: 8, flexWrap: 'wrap' }}>
         {Object.entries(ACTION_LABELS).map(([k, l]) => <button type="button" key={k} className="btn sm" onClick={() => set('actions')([...r.actions, { ...NEW_ACTION[k] }])}>+ {l}</button>)}
       </div>
-      {r.actions.some((a) => ['email', 'task', 'field_update'].includes(a.type)) && <div className="mb"><Placeholders fields={m.fields} /></div>}
+      {r.actions.some((a) => ['email', 'sms', 'task', 'field_update'].includes(a.type)) && <div className="mb"><Placeholders fields={m.fields} /></div>}
 
       <div className="form-footer">
         <Checkbox checked={r.is_active} onChange={set('is_active')}>Active</Checkbox>

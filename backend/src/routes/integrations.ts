@@ -13,10 +13,11 @@ import {
   shopifyTest, shopifyPushStock, shopifyImportOrders,
 } from '../lib/integrations.js';
 import { shipPackage, fetchPackage } from './sales.js';
+import { msg91Test, sendSms, twilioTest } from '../lib/sms.js';
 
 const r = Router();
 
-const TESTS: any = { razorpay: razorpayTest, shiprocket: shiprocketTest, shopify: shopifyTest };
+const TESTS: any = { razorpay: razorpayTest, shiprocket: shiprocketTest, shopify: shopifyTest, twilio: twilioTest, msg91: msg91Test };
 
 r.get('/', can('settings', 'view'), async (req, res) => {
   const { rows: [org] } = await query('SELECT portal_slug FROM organizations WHERE id = $1', [req.orgId]);
@@ -92,6 +93,19 @@ r.post('/razorpay/payment-link/:invoiceId', can('invoices', 'edit'), async (req,
   const url = await ensurePaymentLink(req.orgId, Number(req.params.invoiceId));
   await audit({ query }, req, 'update', 'invoice', Number(req.params.invoiceId), 'Online payment link created');
   res.json({ url });
+});
+
+// Send a text message by hand (e.g. "Send SMS" on an invoice).
+r.post('/sms/send', async (req, res) => {
+  const b = req.body || {};
+  const result = await sendSms(req.orgId, b.to, b.message, { entityType: b.entity_type || null, entityId: Number(b.entity_id) || null, userId: req.user.id });
+  await audit({ query }, req, 'update', b.entity_type || 'sms', Number(b.entity_id) || null, `SMS sent to ${result.to}`);
+  res.json(result);
+});
+
+r.get('/sms/enabled', async (req, res) => {
+  const { rows } = await query("SELECT provider FROM integrations WHERE org_id = $1 AND enabled AND provider IN ('twilio','msg91') LIMIT 1", [req.orgId]);
+  res.json({ enabled: !!rows[0], provider: rows[0]?.provider || null });
 });
 
 r.get('/logs', can('settings', 'view'), async (req, res) => {

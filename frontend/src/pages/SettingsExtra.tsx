@@ -106,6 +106,20 @@ const GUIDES = {
       'Enter your store domain (yourstore.myshopify.com) and the token, Save, and press Test connection to see your location IDs. Then fill in the location ID.'],
     fields: [['shop_domain', 'Store domain', 'config'], ['access_token', 'Admin API access token', 'secret'], ['location_id', 'Shopify location ID (for stock)', 'config']],
   },
+  twilio: {
+    what: 'Send text messages (SMS) to customers and vendors: by hand from any invoice or order, or automatically from workflow rules. Works in most countries.',
+    steps: ['Create a Twilio account at twilio.com and buy (or verify) a phone number that can send SMS.',
+      'On the Twilio Console home page copy the Account SID and Auth Token.',
+      'Enter them here with your Twilio phone number in international format (e.g. +14155550123), tick Enabled, Save, and press Test connection.'],
+    fields: [['account_sid', 'Account SID', 'config'], ['auth_token', 'Auth Token', 'secret'], ['from_number', 'Twilio phone number (sender)', 'config']],
+  },
+  msg91: {
+    what: 'Send SMS in India through MSG91. Indian rules (DLT) require every message to follow a template you register in advance.',
+    steps: ['Create an MSG91 account and complete DLT registration (sender ID and entity).',
+      'Create a DLT-approved template with one variable for the text, e.g. “{#var#} - Your Company”, and add it in MSG91 → Templates (Flow). Name the variable “message” (or enter its name below).',
+      'Copy your Auth Key (MSG91 → API) and the template ID here, tick Enabled and Save. Then send a test from any invoice (More → Send SMS).'],
+    fields: [['auth_key', 'Auth Key', 'secret'], ['template_id', 'Template (flow) ID', 'config'], ['variable_name', 'Template variable name (default: message)', 'config']],
+  },
 };
 
 function IntegrationCard({ it, onSaved, warehouses }: any) {

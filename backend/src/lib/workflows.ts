@@ -60,7 +60,7 @@ export const WF_OPS = {
   gt: 'is greater than / after', gte: 'is at least / on or after', lt: 'is less than / before', lte: 'is at most / on or before',
   is_empty: 'is empty', is_not_empty: 'is not empty',
 };
-export const WF_ACTIONS = ['email', 'webhook', 'field_update', 'task'];
+export const WF_ACTIONS = ['email', 'sms', 'webhook', 'field_update', 'task'];
 
 const columnCache = new Map();
 async function tableColumns(table) {
@@ -152,6 +152,14 @@ function parseAction(a, i, module, meta) {
       const subject = clean(a.subject, 200);
       if (!subject) throw badRequest(`${n}: enter an email subject`);
       return { type: 'email', to_contact, to_creator, emails: emails.join(', '), subject, message: clean(a.message, 5000), include_document: !!a.include_document };
+    }
+    case 'sms': {
+      const numbers = String(a.numbers || '').split(/[,;]+/).map((x) => x.trim()).filter(Boolean);
+      const to_contact = !!a.to_contact && module !== 'item';
+      if (!numbers.length && !to_contact) throw badRequest(`${n}: choose who receives the text message`);
+      const message = clean(a.message, 1000);
+      if (!message) throw badRequest(`${n}: write the text message`);
+      return { type: 'sms', to_contact, numbers: numbers.join(', '), message };
     }
     case 'webhook': {
       const url = clean(a.url, 500);
@@ -302,6 +310,27 @@ async function runAction(a, ctx) {
       await logEmail(ctx.orgId, { entityType: module, entityId: rec.id, to: recipients, subject, status: 'failed', error: err.message });
       return { type: 'email', ok: false, message: err.message };
     }
+  }
+  if (a.type === 'sms') {
+    const { sendSms } = await import('./sms.js');
+    const numbers = String(a.numbers || '').split(/[,;]+/).map((x) => x.trim()).filter(Boolean);
+    if (a.to_contact) {
+      let phone = m.kind === 'doc' ? null : rec.mobile || rec.phone;
+      if (m.kind === 'doc') {
+        const { rows: [c] } = await query('SELECT mobile, phone FROM contacts WHERE id = $1', [rec.contact_id]);
+        phone = c?.mobile || c?.phone;
+      }
+      if (phone) numbers.push(phone);
+    }
+    const unique = [...new Set(numbers)];
+    if (!unique.length) return { type: 'sms', ok: false, message: 'No mobile number to send to (the contact has no mobile number?)' };
+    const text = fillPlaceholders(a.message, ctx);
+    const sent = [];
+    const failed = [];
+    for (const num of unique) {
+      try { sent.push((await sendSms(ctx.orgId, num, text, { entityType: module, entityId: rec.id })).to); } catch (err) { failed.push(`${num}: ${err.message}`); }
+    }
+    return { type: 'sms', ok: !failed.length, message: [sent.length ? `Texted ${sent.join(', ')}` : '', ...failed].filter(Boolean).join('; ') };
   }
   if (a.type === 'webhook') {
     const body = JSON.stringify({

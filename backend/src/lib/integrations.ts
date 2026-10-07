@@ -15,6 +15,8 @@ export const PROVIDERS: any = {
   razorpay: { name: 'Razorpay', category: 'Payments', secrets: ['key_secret', 'webhook_secret'], config: ['key_id'] },
   shiprocket: { name: 'Shiprocket', category: 'Shipping', secrets: ['password'], config: ['email', 'pickup_location', 'default_weight_kg'] },
   shopify: { name: 'Shopify', category: 'Sales channel', secrets: ['access_token'], config: ['shop_domain', 'location_id', 'warehouse_id', 'auto_sync', 'import_orders', 'push_stock'] },
+  twilio: { name: 'Twilio SMS', category: 'Text messages', secrets: ['auth_token'], config: ['account_sid', 'from_number'] },
+  msg91: { name: 'MSG91 SMS (India)', category: 'Text messages', secrets: ['auth_key'], config: ['template_id', 'variable_name'] },
 };
 
 const systemReq = (orgId) => ({ orgId, user: null });

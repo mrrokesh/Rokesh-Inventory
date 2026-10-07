@@ -11,6 +11,7 @@ import Icon from '../../components/Icon';
 import { ApplyCreditModal, PackageModal, ReceiveModal, RefundModal, ReturnModal } from './Modals';
 import { CHALLAN_TYPES } from './config';
 import { Comments, EmailModal } from '../../components/Comms';
+import SmsModal from '../../components/SmsModal';
 import { CustomFieldValues } from '../../components/CustomFields';
 import { TagValues } from '../../components/ReportingTags';
 
@@ -294,6 +295,7 @@ export default function DocDetail({ cfg }: any) {
     default:
   }
   if (EMAILABLE.includes(cfg.key) && !isDraft) actions.push(<button key="email" type="button" className="btn" onClick={() => setModal('email')}>Email</button>);
+  if (!isDraft) more.push(<button key="sms" type="button" onClick={() => setModal('sms')}>Send SMS</button>);
   if (P('create')) more.push(<Link key="clone" to={`${cfg.path}/new?clone=${doc.id}`}>Clone</Link>);
   if (isDraft && P('delete')) more.push(<button key="del" type="button" className="danger" onClick={remove}>Delete</button>);
 
@@ -355,6 +357,9 @@ export default function DocDetail({ cfg }: any) {
       {modal === 'apply' && <ApplyCreditModal credit={doc} kind={cfg.key === 'credit_notes' ? 'credit_note' : 'vendor_credit'} onClose={() => setModal(null)} onDone={() => { setModal(null); refresh(); }} />}
       {modal === 'refund' && <RefundModal cn={doc} onClose={() => setModal(null)} onDone={() => { setModal(null); refresh(); }} />}
       {modal === 'email' && <EmailModal entityType={cfg.entity} entityId={doc.id} onClose={() => setModal(null)} onSent={refresh} />}
+      {modal === 'sms' && <SmsModal entityType={cfg.entity} entityId={doc.id} contactApi={cfg.contactType === 'customer' ? '/customers' : '/vendors'} contactId={doc.contact_id}
+        message={`${cfg.one} ${doc.number} for ${money(doc.total, { currency: doc.currency })}${cfg.hasBalance && Number(doc.balance) > 0 ? `, balance due ${money(doc.balance, { currency: doc.currency })}${doc.due_date ? ` by ${date(doc.due_date)}` : ''}` : ''}. - ${org?.name || ''}`}
+        onClose={() => setModal(null)} />}
     </div>
   );
 }

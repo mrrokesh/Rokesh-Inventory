@@ -560,6 +560,23 @@ export const EXTRA_REPORTS: any = {
       return { columns: [col('created_at', 'When', 'datetime'), col('provider', 'App', 'label'), col('action', 'Action', 'label'), col('status', 'Result', 'status'), col('message', 'Details')], rows };
     },
   },
+  sms_sent: {
+    group: 'Activity', title: 'SMS Sent', dated: true, warehouse: false,
+    description: 'Every text message the app sent (by hand or by workflow rules), and why any failed.',
+    run: async ({ org, from, to }) => {
+      const { rows } = await query(
+        `SELECT s.created_at, s.to_number, s.message, s.status, s.error, s.provider, s.entity_type, COALESCE(u.name, 'Automatic') AS sent_by
+           FROM sms_log s LEFT JOIN users u ON u.id = s.sent_by
+          WHERE s.org_id = $1 AND s.created_at::date BETWEEN $2 AND $3 ORDER BY s.created_at DESC LIMIT 2000`,
+        [org, from, to],
+      );
+      return {
+        columns: [col('created_at', 'When', 'datetime'), col('to_number', 'To'), col('message', 'Message'), col('status', 'Status', 'status'),
+          col('error', 'Error'), col('entity_type', 'Document', 'label'), col('provider', 'Provider', 'label'), col('sent_by', 'Sent by')],
+        rows,
+      };
+    },
+  },
   api_key_usage: {
     group: 'Activity', title: 'API Keys', dated: false, warehouse: false,
     description: 'API keys of this organization, who they act as, and when each was last used.',
