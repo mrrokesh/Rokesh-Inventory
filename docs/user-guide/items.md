@@ -73,6 +73,15 @@ New orders for that customer use the special prices automatically.
 
 Rows with problems are skipped and listed with the reason, so you can fix them and import just those rows again.
 
+## Scan barcodes into orders and invoices
+
+Put the item's barcode (UPC/EAN/ISBN) in the **Barcode** box on the item. Then, on any sales order, invoice, purchase order, bill or other document, click the **Scan barcode** box above the item table and scan:
+
+- A USB or Bluetooth barcode scanner works like a keyboard. It types the code and presses Enter for you.
+- No scanner? Type the barcode or the SKU and press **Enter**.
+
+The item is added with its price and tax. Scanning the same item again adds 1 to its quantity. If nothing matches, a message says so and nothing is added.
+
 ## Change or retire an item
 
 - **Edit:** open the item and press **Edit**.

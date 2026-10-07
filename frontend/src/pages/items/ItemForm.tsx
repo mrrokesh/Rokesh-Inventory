@@ -194,7 +194,7 @@ export default function ItemForm({ composite: compositeProp = false }: any) {
               )}
               {f.track_inventory && (
                 <>
-                  <FormRow label="Valuation method"><Input value="FIFO (First In, First Out)" disabled onChange={() => {}} /></FormRow>
+                  <FormRow label="Valuation method" hint="Set for the whole organization in Settings → Organization profile."><Input value={organization?.valuation_method === 'wac' ? 'Weighted average cost' : 'FIFO (First In, First Out)'} disabled onChange={() => {}} /></FormRow>
                   {!composite && (
                     <FormRow label="Serial / batch tracking" hint="Serial numbers: every unit has its own number (laptops, printers). Batches: lots with expiry dates (toner, chemicals). Can't be changed once the item has stock.">
                       <Select value={f.tracking} onChange={set('tracking')} options={[['none', 'None'], ['serial', 'Serial numbers'], ['batch', 'Batches (with expiry date)']]} />

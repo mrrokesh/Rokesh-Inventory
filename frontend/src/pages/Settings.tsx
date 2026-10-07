@@ -102,7 +102,25 @@ function Organization() {
           <FormRow label="Negative stock" hint="When off, sales, shipments and adjustments are blocked if there is not enough stock.">
             <Checkbox checked={f.allow_negative_stock} onChange={set('allow_negative_stock')} disabled={!editable}>Allow stock to go below zero</Checkbox>
           </FormRow>
-          <FormRow label="Valuation method"><Input value="FIFO (First In, First Out)" disabled onChange={() => {}} /></FormRow>
+          <FormRow label="Stock valuation" hint={f.valuation_method === 'wac'
+            ? 'Weighted average: every unit of an item in a warehouse has the same cost — the average of everything you have in stock. It is recalculated each time stock comes in.'
+            : 'FIFO: the oldest stock is sold first, at the price you paid for it.'}>
+            <Select value={f.valuation_method || 'fifo'} disabled={!editable}
+              onChange={async (v) => {
+                const msg = v === 'wac'
+                  ? 'Switch to weighted average cost? The stock you have now will be given its average cost when you save. Past sales keep the cost they had.'
+                  : 'Switch to FIFO? From now on, new stock keeps its own purchase price and the oldest stock is used first. Current stock keeps its present (average) cost.';
+                if (await confirmDialog({ message: msg, confirmText: 'Switch' })) set('valuation_method')(v);
+              }}
+              options={[['fifo', 'FIFO (First In, First Out)'], ['wac', 'Weighted average cost']]} />
+          </FormRow>
+          <FormRow label="Inventory start date" hint="Stock can't be recorded before this date — useful once you've entered opening stock, so old-dated entries can't change it. Leave empty for no limit.">
+            <div className="row"><Input type="date" value={f.inventory_start_date ? String(f.inventory_start_date).slice(0, 10) : ''} onChange={(v) => set('inventory_start_date')(v || null)} disabled={!editable} />
+              {f.inventory_start_date && editable && <button type="button" className="btn link small" onClick={() => set('inventory_start_date')(null)}>Clear</button>}</div>
+          </FormRow>
+          <FormRow label="Item names" hint="When off, two items can't have the same name (SKUs must always be different).">
+            <Checkbox checked={f.allow_duplicate_item_names !== false} onChange={set('allow_duplicate_item_names')} disabled={!editable}>Allow more than one item with the same name</Checkbox>
+          </FormRow>
         </div>
       </div></div>
       {editable && <div className="form-footer"><button className="btn primary" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button></div>}

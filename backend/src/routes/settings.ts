@@ -4,7 +4,8 @@ import { query, tx } from '../db.js';
 import { can, requireAdmin } from '../middleware/auth.js';
 import { audit } from '../lib/audit.js';
 import { badRequest, conflict, notFound } from '../lib/errors.js';
-import { str, num, int, bool, id, email, obj, oneOf, listParams } from '../lib/validate.js';
+import { str, num, int, bool, id, email, obj, oneOf, date, listParams } from '../lib/validate.js';
+import { reaverageAll } from '../lib/stock.js';
 import { MODULES, sanitizePermissions } from '../lib/permissions.js';
 import { imageUpload, removePublic } from '../lib/upload.js';
 import { formatNumber } from '../lib/numbering.js';
@@ -40,7 +41,7 @@ r.put('/organization', can('settings', 'edit'), async (req, res) => {
   if (gstRegistered && (!gstin || !/^[0-9]{2}[A-Z0-9]{13}$/.test(gstin.toUpperCase()))) {
     throw badRequest('Enter a valid 15-character GSTIN');
   }
-  const values = {
+  const values: any = {
     name: str(b.name, { field: 'Organization name', required: true, max: 200 }),
     legal_name: str(b.legal_name, { field: 'Legal name', max: 200 }),
     industry: str(b.industry, { field: 'Industry', max: 100 }),
@@ -60,13 +61,27 @@ r.put('/organization', can('settings', 'edit'), async (req, res) => {
     allow_negative_stock: bool(b.allow_negative_stock),
     brand_color: (() => { const c = str(b.brand_color, { field: 'Brand colour', max: 7 }); if (c && !/^#[0-9a-fA-F]{6}$/.test(c)) throw badRequest('Brand colour must look like #408dfb'); return c; })(),
   };
+  // Inventory preferences: only changed when sent, so older screens can't reset them by accident.
+  if (b.valuation_method !== undefined) values.valuation_method = oneOf(b.valuation_method, ['fifo', 'wac'], { field: 'Valuation method' });
+  if (b.inventory_start_date !== undefined) values.inventory_start_date = date(b.inventory_start_date, { field: 'Inventory start date' });
+  if (b.allow_duplicate_item_names !== undefined) values.allow_duplicate_item_names = bool(b.allow_duplicate_item_names);
   const keys = Object.keys(values);
-  const { rows } = await query(
-    `UPDATE organizations SET ${keys.map((k, i) => `${k} = $${i + 2}`).join(', ')} WHERE id = $1 RETURNING *`,
-    [req.orgId, ...keys.map((k) => values[k])],
-  );
+  const row = await tx(async (client) => {
+    const { rows: [before] } = await client.query('SELECT valuation_method FROM organizations WHERE id = $1 FOR UPDATE', [req.orgId]);
+    const { rows: [after] } = await client.query(
+      `UPDATE organizations SET ${keys.map((k, i) => `${k} = $${i + 2}`).join(', ')} WHERE id = $1 RETURNING *`,
+      [req.orgId, ...keys.map((k) => values[k])],
+    );
+    if (before.valuation_method !== after.valuation_method) {
+      // Moving to weighted average: every item's current stock takes its average cost from now on.
+      const n = after.valuation_method === 'wac' ? await reaverageAll(client, req.orgId) : 0;
+      await audit(client, req, 'update', 'organization', req.orgId,
+        `Stock valuation changed to ${after.valuation_method === 'wac' ? `weighted average (${n} item/warehouse costs averaged)` : 'FIFO'}`);
+    }
+    return after;
+  });
   await audit({ query }, req, 'update', 'organization', req.orgId, 'Organization profile updated');
-  res.json(rows[0]);
+  res.json(row);
 });
 
 r.post('/organization/logo', can('settings', 'edit'), imageUpload.single('file'), async (req, res) => {

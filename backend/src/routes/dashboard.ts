@@ -124,7 +124,7 @@ r.get('/', async (req, res) => {
          FROM sales_orders WHERE org_id = $1 AND doc_date BETWEEN $2 AND $3`, [org, from, to]),
   ]);
 
-  const [lowStockItems, [aging], openShipments, [today]] = await Promise.all([
+  const [lowStockItems, [aging], openShipments, [today], salesByChannel, receiveHistory] = await Promise.all([
     q(`SELECT i.id, i.name, i.sku, i.unit, i.reorder_level, COALESCE(s.on_hand,0) AS on_hand, COALESCE(s.available,0) AS available,
               i.preferred_vendor_id
          FROM items i LEFT JOIN (SELECT item_id, SUM(on_hand) AS on_hand, SUM(on_hand - committed) AS available FROM stock_levels WHERE org_id = $1 GROUP BY item_id) s
@@ -147,12 +147,20 @@ r.get('/', async (req, res) => {
         (SELECT COUNT(*) FROM sales_orders WHERE org_id = $1 AND doc_date = CURRENT_DATE)::int AS sales_orders,
         (SELECT COALESCE(SUM(amount),0) FROM payments_received WHERE org_id = $1 AND payment_date = CURRENT_DATE) AS received,
         (SELECT COUNT(*) FROM shipments WHERE org_id = $1 AND ship_date = CURRENT_DATE)::int AS shipped`),
+    q(`SELECT COALESCE(so.channel, 'direct') AS channel, SUM(d.total) AS total, COUNT(*)::int AS invoices
+         FROM invoices d LEFT JOIN sales_orders so ON so.id = d.sales_order_id
+        WHERE d.org_id = $1 AND d.status IN ('sent','partially_paid','paid') AND d.doc_date BETWEEN $2 AND $3
+        GROUP BY 1 ORDER BY 2 DESC`, [org, from, to]),
+    q(`SELECT p.id, p.number, p.receive_date, c.display_name AS vendor, SUM(l.quantity) AS quantity
+         FROM purchase_receives p JOIN purchase_receive_lines l ON l.receive_id = p.id JOIN contacts c ON c.id = p.contact_id
+        WHERE p.org_id = $1 GROUP BY p.id, c.display_name ORDER BY p.receive_date DESC, p.id DESC LIMIT 7`),
   ]);
 
   res.json({
     generated_at: new Date().toISOString(), low_stock_items: lowStockItems, receivables_aging: aging, open_shipments: openShipments, today,
     period: { from, to }, pending, inventory: inv, products, top_selling: topSelling, top_stocked: topStocked,
     sales_by_month: salesByMonth, sales_summary: salesSummary, purchases, money, top_vendors: topVendors,
+    sales_by_channel: salesByChannel, receive_history: receiveHistory,
     recent_activity: recentActivity, recent_sales_orders: recentSOs, recent_purchase_orders: recentPOs, onboarding,
   });
 });

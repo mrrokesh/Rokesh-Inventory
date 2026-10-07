@@ -10,6 +10,19 @@ Your company name, address, logo, GST registration, PAN, currency, fiscal year a
 - **GST registered** – tick this and enter your GSTIN if you're registered.
 - **Allow stock to go below zero** – leave this **off** unless you really need to sell before recording stock.
 
+## Inventory preferences
+
+Under **Settings → Organization profile → Inventory preferences**:
+
+- **Negative stock**: whether sales can go ahead when the system shows not enough stock.
+- **Stock valuation**: how the cost of stock is worked out.
+  - **FIFO** (first in, first out): the oldest stock is used first, at the price you paid for it.
+  - **Weighted average cost**: every unit of an item in a warehouse has the same cost, the average of everything in stock. It's recalculated whenever stock comes in.
+
+  You can switch at any time. When you switch to weighted average, current stock gets its average cost straight away. Past sales are not changed.
+- **Inventory start date**: stock can't be recorded with an earlier date. Set it once your opening stock is in, so nobody accidentally back-dates a bill or adjustment and changes your opening figures. Leave it empty for no limit.
+- **Item names**: tick *Allow more than one item with the same name* if you really need it (for example the same product from two brands). Otherwise the app stops you from creating a second "Office Chair". SKUs must always be different.
+
 ## Taxes
 
 Add every tax rate you charge, e.g. GST5, GST12, GST18, GST28. Then pick the right tax on each item; orders and invoices calculate tax automatically.

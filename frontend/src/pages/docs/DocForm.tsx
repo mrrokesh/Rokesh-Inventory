@@ -185,6 +185,34 @@ export default function DocForm({ cfg }: any) {
     if (contact?.price_list_id) applyPriceList(contact.price_list_id, [{ item_id: it.id }]);
   };
 
+  // Barcode scanner / quick entry: a scanner types the code and presses Enter.
+  const [scan, setScan] = useState('');
+  const [scanMsg, setScanMsg] = useState(null);
+  const onScan = async (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const code = scan.trim();
+    if (!code) return;
+    setScan('');
+    try {
+      const it = await api.get('/items/lookup/code', { code });
+      let added = false;
+      setLines((ls) => {
+        const same = ls.find((l) => l.item_id === it.id && !l.tracking);
+        if (same) return ls.map((l) => (l === same ? { ...l, quantity: Number(l.quantity || 0) + 1 } : l));
+        added = true;
+        const line = newLine({ item_id: it.id, item_name: it.name, rate: it[priceField], tax_id: it[taxField] || '', track: it.track_inventory, available: it.available_stock, unit: it.unit, tmode: it.tracking || 'none',
+          description: (cfg.priceKind === 'sales' ? it.sales_description : it.purchase_description) || '' });
+        const blank = ls.findIndex((l) => !l.item_id && !l.description);
+        return blank >= 0 ? ls.map((l, i) => (i === blank ? line : l)) : [...ls, line];
+      });
+      if (contact?.price_list_id) applyPriceList(contact.price_list_id, [{ item_id: it.id }]);
+      setScanMsg({ ok: true, text: `${it.name} ${added ? 'added' : '+1'}` });
+    } catch (err) {
+      setScanMsg({ ok: false, text: err.message });
+    }
+  };
+
   const totals = useMemo(() => computeTotals(lines, taxes, h), [lines, taxes, h]);
   const creditWarning = cfg.contactType === 'customer' && contact?.credit_limit && (Number(contact.receivables || 0) + totals.total > Number(contact.credit_limit));
 
@@ -269,7 +297,16 @@ export default function DocForm({ cfg }: any) {
         </div></div>
 
         <div className="card mb">
-          <div className="card-head"><h3>Item table</h3></div>
+          <div className="card-head">
+            <h3>Item table</h3>
+            <div className="spacer" />
+            {!linked && (
+              <div className="row" style={{ gap: 8 }}>
+                {scanMsg && <span className="small" style={{ color: scanMsg.ok ? 'var(--green)' : 'var(--danger, #d33)' }}>{scanMsg.text}</span>}
+                <input className="input" style={{ width: 240 }} placeholder="Scan barcode or type SKU + Enter" value={scan} onChange={(e) => { setScan(e.target.value); setScanMsg(null); }} onKeyDown={onScan} aria-label="Scan barcode" />
+              </div>
+            )}
+          </div>
           <div className="table-wrap">
             <table className="table lines">
               <thead>

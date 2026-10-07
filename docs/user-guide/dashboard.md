@@ -46,6 +46,8 @@ Press **Reset** (while customizing) to go back to the standard layout.
 | Best sellers | What sells the most? |
 | On the way | Which shipments haven't been delivered yet? |
 | Top vendors | Whom do I buy from the most? |
+| Sales by channel | How much of my sales comes from each channel (direct, Shopify…)? |
+| Receive history | What did vendors deliver most recently? |
 | Recent activity | What did my team just do? |
 
 > **Tip:** You only see widgets for the parts of the app your role is allowed to use.

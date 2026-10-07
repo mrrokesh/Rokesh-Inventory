@@ -66,6 +66,20 @@ r.get('/meta/lookups', can('items', 'view'), async (req, res) => {
   res.json(rows[0]);
 });
 
+/** Barcode scanners: find one item by exact barcode or SKU (case-insensitive). */
+r.get('/lookup/code', can('items', 'view'), async (req, res) => {
+  const code = String(req.query.code || '').trim();
+  if (!code) throw badRequest('Scan or type a barcode');
+  const { rows } = await query(
+    `SELECT i.*, COALESCE((SELECT SUM(on_hand - committed) FROM stock_levels s WHERE s.item_id = i.id), 0)::float AS available_stock
+       FROM items i WHERE i.org_id = $1 AND i.status = 'active' AND (lower(i.barcode) = lower($2) OR lower(i.sku) = lower($2))
+      ORDER BY (lower(i.barcode) = lower($2)) DESC LIMIT 1`,
+    [req.orgId, code],
+  );
+  if (!rows[0]) throw notFound(`Item with barcode or SKU “${code}”`);
+  res.json(rows[0]);
+});
+
 r.get('/:id', can('items', 'view'), async (req, res) => {
   const itemId = Number(req.params.id);
   const { rows } = await query(
@@ -194,9 +208,15 @@ export async function parseItem(b: any, req: any, existing?: any) {
     if (!rows[0]) throw badRequest('Select a valid preferred vendor');
   }
   const tracking = track && !isComposite ? oneOf(b.tracking, ['none', 'serial', 'batch'], { field: 'Tracking', def: 'none' }) : 'none';
+  const name = str(b.name, { field: 'Name', required: true, max: 250 });
+  const { rows: [pref] } = await query('SELECT allow_duplicate_item_names FROM organizations WHERE id = $1', [req.orgId]);
+  if (pref && !pref.allow_duplicate_item_names) {
+    const { rows: dup } = await query('SELECT sku FROM items WHERE org_id = $1 AND lower(name) = lower($2) AND id <> $3 LIMIT 1', [req.orgId, name, existing?.id || 0]);
+    if (dup.length) throw conflict(`An item named “${name}” already exists${dup[0].sku ? ` (SKU ${dup[0].sku})` : ''}. Use a different name, or allow duplicate names in Settings → Organization profile.`);
+  }
   return {
     tracking,
-    name: str(b.name, { field: 'Name', required: true, max: 250 }),
+    name,
     sku: str(b.sku, { field: 'SKU', max: 100 }),
     barcode: str(b.barcode, { field: 'Barcode', max: 100 }),
     item_type: itemType,

@@ -5,7 +5,7 @@ import { can } from '../middleware/auth.js';
 import { audit } from '../lib/audit.js';
 import { badRequest, conflict, notFound } from '../lib/errors.js';
 import { str, num, id, date, oneOf, today, listParams, round2 } from '../lib/validate.js';
-import { addLotCost, ctxOf } from '../lib/stock.js';
+import { addLotCost, ctxOf, isWeightedAverage, shiftAverageValue } from '../lib/stock.js';
 
 const r = Router();
 const SOURCES = { purchase_receive: { table: 'purchase_receives', dateCol: 'receive_date', label: 'Purchase receive' }, bill: { table: 'bills', dateCol: 'doc_date', label: 'Bill' } };
@@ -189,7 +189,12 @@ r.post('/:id/void', can('bills', 'edit'), async (req, res) => {
         throw conflict(`Stock of ${l.item_name} from ${l.source_number} has been used since the cost was added, so it cannot be voided. Use a value adjustment instead.`);
       }
     }
-    for (const l of lc.lines) await client.query('UPDATE stock_lots SET unit_cost = GREATEST(0, unit_cost - $2) WHERE id = $1', [l.lot_id, Number(l.per_unit)]);
+    if (await isWeightedAverage(client, req.orgId)) {
+      // The cost was blended into the item's average: take the same amount back out of the average.
+      for (const l of lc.lines) await shiftAverageValue(client, req.orgId, l.item_id, l.warehouse_id, -Number(l.per_unit) * Number(l.remaining_at_apply));
+    } else {
+      for (const l of lc.lines) await client.query('UPDATE stock_lots SET unit_cost = GREATEST(0, unit_cost - $2) WHERE id = $1', [l.lot_id, Number(l.per_unit)]);
+    }
     await client.query("DELETE FROM stock_movements WHERE org_id = $1 AND source_type = 'landed_cost' AND source_id = $2", [req.orgId, lc.id]);
     await client.query("UPDATE landed_costs SET status = 'void', voided_at = now() WHERE id = $1", [lc.id]);
     await audit(client, req, 'void', 'landed_cost', lc.id, `Landed cost ${lc.number} voided`);

@@ -303,6 +303,44 @@ export const WIDGETS: any[] = [
     )),
   },
   {
+    id: 'sales_by_channel', title: 'Sales by channel', icon: 'sales', color: 'purple', perm: 'invoices', sizes: ['small', 'medium'], defaultSize: 'medium',
+    description: 'Where your sales come from: direct, Shopify and other channels.',
+    link: () => '/reports/sales_by_channel',
+    render: ({ data, size }) => {
+      const ch = data.sales_by_channel || [];
+      if (!ch.length) return <Empty>Sales by channel appear once you send invoices.</Empty>;
+      const total = ch.reduce((s, c) => s + Number(c.total), 0) || 1;
+      const colors = ['#408dfb', '#8e6cef', '#22b07d', '#f5a623', '#e5534b'];
+      return (
+        <div>
+          <div className="w-big md">{compact(total)}</div><div className="small faint">Total sales this period</div>
+          <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', margin: '10px 0' }}>
+            {ch.map((c, i) => <div key={c.channel} style={{ width: `${(Number(c.total) / total) * 100}%`, background: colors[i % colors.length] }} title={label(c.channel)} />)}
+          </div>
+          <ul className="w-list">
+            {ch.slice(0, size === 'small' ? 2 : 4).map((c, i) => (
+              <li key={c.channel}><span className="grow"><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4, background: colors[i % colors.length], marginRight: 6 }} />{label(c.channel)}</span>
+                <span className="meta">{compact(c.total)} · {Math.round((Number(c.total) / total) * 100)}%</span></li>
+            ))}
+          </ul>
+        </div>
+      );
+    },
+  },
+  {
+    id: 'receive_history', title: 'Receive history', icon: 'purchases', color: 'green', perm: 'purchase_receives', sizes: ['medium', 'large'], defaultSize: 'medium',
+    description: 'The latest goods received from vendors.',
+    link: () => '/purchase-receives',
+    render: ({ data, size }) => (!(data.receive_history || []).length ? <Empty>Goods you receive against purchase orders show up here.</Empty> : (
+      <ul className="w-list">
+        {data.receive_history.slice(0, rows(size, 4, 7)).map((r) => (
+          <li key={r.id}><span className="grow"><Link to={`/purchase-receives/${r.id}`} onClick={(e) => e.stopPropagation()}>{r.number}</Link> · {r.vendor}</span>
+            <span className="meta">{qty(r.quantity)} · {date(r.receive_date)}</span></li>
+        ))}
+      </ul>
+    )),
+  },
+  {
     id: 'recent_activity', title: 'Recent activity', icon: 'reports', color: 'blue', sizes: ['medium', 'large'], defaultSize: 'medium',
     description: 'Catch up on what your team created, changed or deleted.',
     link: () => '/settings/audit',
