@@ -60,6 +60,7 @@ const Settings = lazy(() => import('./pages/Settings'));
 const Profile = lazy(() => import('./pages/Settings').then((m) => ({ default: m.Profile })));
 const Help = lazy(() => import('./pages/help/Help'));
 const Portal = lazy(() => import('./pages/portal/Portal'));
+const Platform = lazy(() => import('./pages/platform/Platform'));
 
 function Guard({ perm, action = 'view', children }: { perm?: string; action?: string; children: ReactNode }) {
   const { can } = useAuth();
@@ -83,6 +84,13 @@ export default function App() {
     return (
       <Suspense fallback={<Spinner />}>
         <Routes><Route path="/portal/:slug/*" element={<Portal />} /></Routes>
+      </Suspense>
+    );
+  }
+  if (location.pathname.startsWith('/platform')) {
+    return (
+      <Suspense fallback={<Spinner />}>
+        <Routes><Route path="/platform/*" element={<Platform />} /></Routes>
       </Suspense>
     );
   }

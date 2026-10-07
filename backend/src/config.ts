@@ -7,6 +7,11 @@ function required(name) {
   return value;
 }
 
+const signupMode = (process.env.SIGNUP_MODE || 'invite_only').toLowerCase();
+if (!['open', 'invite_only', 'closed'].includes(signupMode)) {
+  throw new Error('SIGNUP_MODE must be open, invite_only, or closed');
+}
+
 export const config = {
   databaseUrl: required('DATABASE_URL'),
   jwtSecret: required('JWT_SECRET'),
@@ -14,4 +19,10 @@ export const config = {
   port: Number(process.env.PORT || 4000),
   corsOrigin: (process.env.CORS_ORIGIN || 'http://localhost:5173').split(',').map((s) => s.trim()),
   uploadDir: path.resolve(process.env.UPLOAD_DIR || 'uploads'),
+  /** open = public self-serve (trial); invite_only/closed = only platform creates orgs */
+  signupMode: signupMode as 'open' | 'invite_only' | 'closed',
+  platformAdminEmail: process.env.PLATFORM_ADMIN_EMAIL || '',
+  platformAdminPassword: process.env.PLATFORM_ADMIN_PASSWORD || '',
+  platformAdminName: process.env.PLATFORM_ADMIN_NAME || 'Platform Admin',
+  trialDays: Number(process.env.TRIAL_DAYS || 14),
 };

@@ -17,6 +17,7 @@ import { contactsRouter } from './routes/contacts.js';
 import { adjustments, transfers, assemblies } from './routes/inventory.js';
 import { stockCounts, picklists } from './routes/warehouseOps.js';
 import taskRoutes from './routes/tasks.js';
+import announcementRoutes from './routes/announcements.js';
 import { salesOrders, packages, shipments, invoices, salesReturns, creditNotes } from './routes/sales.js';
 import { purchaseOrders, purchaseReceives, bills, vendorCredits } from './routes/purchases.js';
 import { paymentsRouter } from './routes/payments.js';
@@ -28,8 +29,10 @@ import emailRoutes from './routes/email.js';
 import integrationRoutes from './routes/integrations.js';
 import commentRoutes from './routes/comments.js';
 import portalRoutes, { portalAdmin } from './routes/portal.js';
+import platformRoutes from './routes/platform.js';
 import { handleRazorpayWebhook, startIntegrationScheduler } from './lib/integrations.js';
 import { startWebhookWorker } from './lib/webhooks.js';
+import { bootstrapPlatformAdmin } from './lib/bootstrapPlatform.js';
 
 const app = express();
 app.disable('x-powered-by');
@@ -66,6 +69,7 @@ app.use('/uploads/public', express.static(publicDir, { maxAge: '7d', fallthrough
 
 app.use('/api/auth', authRoutes);
 app.use('/api/portal', portalRoutes);
+app.use('/api/platform', platformRoutes);
 
 const api = express.Router();
 api.use(authenticate);
@@ -83,6 +87,7 @@ api.use('/assemblies', assemblies);
 api.use('/stock-counts', stockCounts);
 api.use('/picklists', picklists);
 api.use('/tasks', taskRoutes);
+api.use('/announcements', announcementRoutes);
 api.use('/estimates', estimates);
 api.use('/sales-orders', salesOrders);
 api.use('/delivery-challans', deliveryChallans);
@@ -115,6 +120,7 @@ if (fs.existsSync(dist)) {
 app.use(errorHandler);
 
 migrate()
+  .then(() => bootstrapPlatformAdmin())
   .then(() => {
     app.listen(config.port, () => console.log(`Inventory API listening on http://localhost:${config.port}`));
     startWebhookWorker();

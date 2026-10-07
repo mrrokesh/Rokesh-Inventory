@@ -161,7 +161,11 @@ function GlobalSearch() {
 
 function Notifications() {
   const [data, setData] = useState(null);
-  const load = () => api.get('/dashboard', { period: 'this_month' }).then(setData).catch(() => {});
+  const [openTasks, setOpenTasks] = useState(0);
+  const load = () => {
+    api.get('/dashboard', { period: 'this_month' }).then(setData).catch(() => {});
+    api.get('/tasks', { status: 'open', assignee_id: 'me', per_page: 1 }).then((r) => setOpenTasks(r.total || 0)).catch(() => {});
+  };
   useEffect(() => { load(); }, []);
   const p = data?.pending || {};
   const lowStock = data?.products?.low_stock || 0;
@@ -172,6 +176,7 @@ function Notifications() {
     p.to_be_shipped > 0 && { text: `${p.to_be_shipped} package(s) to be shipped`, to: '/packages?status=not_shipped' },
     p.to_be_received > 0 && { text: `${p.to_be_received} purchase order(s) to be received`, to: '/purchase-orders?status=issued' },
     overdue && { text: 'Some customer invoices are overdue', to: '/invoices?status=overdue' },
+    openTasks > 0 && { text: `${openTasks} open task(s) assigned to you`, to: '/tasks?status=open&assignee_id=me' },
   ].filter(Boolean);
   return (
     <Dropdown button={(toggle) => (
@@ -183,6 +188,58 @@ function Notifications() {
       <div className="sep" />
       {items.length === 0 && <div className="faint" style={{ padding: '8px 14px' }}>You're all caught up.</div>}
       {items.map((n) => <Link key={n.text} to={n.to}>{n.text}</Link>)}
+    </Dropdown>
+  );
+}
+
+function AnnouncementsBell() {
+  const [inbox, setInbox] = useState({ data: [], unread: 0 });
+  const [active, setActive] = useState(null);
+  const load = () => api.get('/announcements/inbox').then(setInbox).catch(() => {});
+  useEffect(() => { load(); const t = setInterval(load, 60000); return () => clearInterval(t); }, []);
+  const openOne = async (a) => {
+    setActive(a);
+    if (!a.read) {
+      await api.post(`/announcements/${a.id}/read`).catch(() => {});
+      load();
+    }
+  };
+  const markAll = async () => {
+    await api.post('/announcements/read-all').catch(() => {});
+    load();
+  };
+  return (
+    <Dropdown button={(toggle) => (
+      <button type="button" className="icon-btn" onClick={() => { load(); setActive(null); toggle(); }} aria-label="Announcements" title="Announcements">
+        <Icon name="megaphone" />{inbox.unread > 0 && <span className="dot" />}
+      </button>
+    )}>
+      <div className="row" style={{ padding: '6px 14px', gap: 8 }}>
+        <strong style={{ flex: 1 }}>Announcements</strong>
+        {inbox.unread > 0 && <button type="button" className="btn sm ghost" onClick={markAll}>Mark all read</button>}
+      </div>
+      <div className="sep" />
+      {active ? (
+        <div style={{ padding: '10px 14px', width: 320, maxWidth: '80vw' }}>
+          <button type="button" className="btn sm ghost" onClick={() => setActive(null)}>← Back</button>
+          <h3 style={{ margin: '10px 0 4px' }}>{active.title}</h3>
+          <div className="small faint mb">{active.published_at ? new Date(active.published_at).toLocaleString('en-IN') : ''}</div>
+          <div style={{ whiteSpace: 'pre-wrap', fontSize: 13, lineHeight: 1.5 }}>{active.body || 'No details.'}</div>
+        </div>
+      ) : (
+        <>
+          {(!inbox.data || inbox.data.length === 0) && <div className="faint" style={{ padding: '8px 14px' }}>No announcements yet.</div>}
+          {(inbox.data || []).map((a) => (
+            <button type="button" key={a.id} onClick={() => openOne(a)} style={{ textAlign: 'left', width: '100%' }}>
+              <div className="row" style={{ gap: 8 }}>
+                {!a.read && <span className="dot" style={{ position: 'static', flexShrink: 0 }} />}
+                <span className={a.read ? '' : 'bold'} style={{ flex: 1 }}>{a.title}</span>
+                {a.pinned && <span className="badge">Pinned</span>}
+              </div>
+            </button>
+          ))}
+        </>
+      )}
     </Dropdown>
   );
 }
@@ -212,6 +269,7 @@ export default function Layout({ children }: any) {
               ))}
             </div>
           </Dropdown>
+          <AnnouncementsBell />
           <Notifications />
           <Link className="icon-btn" to={`/help/${helpSlugFor(pathname)}`} title="Help for this page" aria-label="Help"><Icon name="help" /></Link>
           {can('settings') && <button type="button" className="icon-btn" onClick={() => navigate('/settings')} aria-label="Settings"><Icon name="settings" /></button>}

@@ -17,9 +17,13 @@ function Organization() {
   const toast = useToast();
   const logoInput = useRef(null);
   const [f, setF] = useState(null);
+  const [plan, setPlan] = useState(null);
   const [error, setError] = useState(null);
   const [busy, run] = useAction(toast);
-  const load = () => api.get('/settings/organization').then((o) => setF({ ...o, address: { street1: '', street2: '', city: '', state: '', zip: '', country: 'India', phone: '', ...o.address } })).catch(setError);
+  const load = () => {
+    api.get('/settings/organization').then((o) => setF({ ...o, address: { street1: '', street2: '', city: '', state: '', zip: '', country: 'India', phone: '', ...o.address } })).catch(setError);
+    api.get('/settings/plan').then(setPlan).catch(() => {});
+  };
   useEffect(() => { load(); }, []);
   if (error) return <ErrorBox error={error} />;
   if (!f) return <Spinner />;
@@ -40,9 +44,20 @@ function Organization() {
   const removeLogo = async () => {
     if ((await run(() => api.del('/settings/organization/logo'), 'Logo removed')) !== undefined) { setF((x) => ({ ...x, logo_path: null })); invalidateLookups('organization'); }
   };
+  const usage = plan?.usage || {};
+  const lim = (n, max) => (max == null ? String(n ?? 0) : `${n ?? 0} / ${max}`);
   return (
     <form onSubmit={save}>
       <PageHead title="Organization Profile" />
+      {plan?.plan_name && (
+        <div className="card mb"><div className="card-body row" style={{ gap: 24, flexWrap: 'wrap' }}>
+          <div><div className="small faint">Plan</div><div className="bold">{plan.plan_name}</div></div>
+          <div><div className="small faint">Status</div><div><Badge status={plan.status || f.status} /></div></div>
+          <div><div className="small faint">Users</div><div>{lim(usage.users, plan.max_users)}</div></div>
+          <div><div className="small faint">Warehouses</div><div>{lim(usage.warehouses, plan.max_warehouses)}</div></div>
+          <div><div className="small faint">Items</div><div>{lim(usage.items, plan.max_items)}</div></div>
+        </div></div>
+      )}
       <div className="card"><div className="card-body">
         <div className="form-section">
           <FormRow label="Logo" hint="Appears on invoices, orders and receipts. PNG/JPG up to 5 MB.">
@@ -417,8 +432,75 @@ function AuditLog() {
 // ------------------------------------------------------------------ shell
 const LINKS = [
   ['organization', 'Organization profile'], ['warehouses', 'Warehouses'], ['taxes', 'Taxes'], ['units', 'Units'], ['numbering', 'Number series'],
-  ['carriers', 'Shipping carriers'], ['email', 'Email'], ['integrations', 'Integrations'], ['developer', 'API keys & webhooks', 'users'], ['users', 'Users', 'users'], ['roles', 'Roles & permissions', 'users'], ['audit', 'Audit log', 'reports'],
+  ['carriers', 'Shipping carriers'], ['email', 'Email'], ['announcements', 'Announcements'], ['integrations', 'Integrations'],
+  ['developer', 'API keys & webhooks', 'users'], ['users', 'Users', 'users'], ['roles', 'Roles & permissions', 'users'], ['audit', 'Audit log', 'reports'],
 ];
+
+function AnnouncementsAdmin() {
+  const { can } = useAuth();
+  const toast = useToast();
+  const [busy, run] = useAction(toast);
+  const { data, reload } = useApi('/announcements', { per_page: 100 });
+  const [show, setShow] = useState(false);
+  const [f, setF] = useState({ title: '', body: '', status: 'published', pinned: false });
+  const editable = can('settings', 'edit');
+  const save = async () => {
+    if ((await run(() => api.post('/announcements', f), 'Announcement published')) !== undefined) {
+      setShow(false); setF({ title: '', body: '', status: 'published', pinned: false }); reload();
+    }
+  };
+  const archive = async (a) => {
+    if ((await run(() => api.put(`/announcements/${a.id}`, { ...a, status: 'archived' }), 'Announcement archived')) !== undefined) reload();
+  };
+  const remove = async (a) => {
+    if (!(await confirmDialog({ message: `Delete “${a.title}”?`, danger: true, confirmText: 'Delete' }))) return;
+    if ((await run(() => api.del(`/announcements/${a.id}`), 'Deleted')) !== undefined) reload();
+  };
+  if (!data) return <Spinner />;
+  return (
+    <>
+      <PageHead title="Announcements">
+        {editable && <button type="button" className="btn primary" onClick={() => setShow(true)}>+ New announcement</button>}
+      </PageHead>
+      <p className="muted" style={{ marginTop: 0 }}>Post notices for your team. They appear under the megaphone icon in the top bar (like Zoho’s announcements).</p>
+      {show && (
+        <div className="card mb"><div className="card-body stack">
+          <Field label="Title" required><Input value={f.title} onChange={(v) => setF({ ...f, title: v })} autoFocus /></Field>
+          <Field label="Message"><Textarea value={f.body} onChange={(v) => setF({ ...f, body: v })} rows={5} /></Field>
+          <div className="grid-2">
+            <Field label="Status"><Select value={f.status} onChange={(v) => setF({ ...f, status: v })} options={[['published', 'Published'], ['draft', 'Draft'], ['archived', 'Archived']]} /></Field>
+            <label className="checkbox" style={{ alignSelf: 'end' }}><input type="checkbox" checked={f.pinned} onChange={(e) => setF({ ...f, pinned: e.target.checked })} /> Pin to top</label>
+          </div>
+          <div className="row">
+            <button type="button" className="btn primary" disabled={busy || !f.title} onClick={save}>Save</button>
+            <button type="button" className="btn" onClick={() => setShow(false)}>Cancel</button>
+          </div>
+        </div></div>
+      )}
+      <div className="card"><table className="table">
+        <thead><tr><th>Title</th><th>Status</th><th>Published</th><th>Reads</th><th>By</th>{editable && <th />}</tr></thead>
+        <tbody>
+          {!data.data?.length && <tr><td colSpan={6} className="faint center">No announcements yet.</td></tr>}
+          {(data.data || []).map((a) => (
+            <tr key={a.id}>
+              <td><span className="bold">{a.title}</span>{a.pinned && <span className="badge" style={{ marginLeft: 8 }}>Pinned</span>}<div className="small faint" style={{ whiteSpace: 'pre-wrap' }}>{(a.body || '').slice(0, 120)}</div></td>
+              <td><Badge status={a.status} /></td>
+              <td>{a.published_at ? dateTime(a.published_at) : '—'}</td>
+              <td>{a.read_count ?? 0}</td>
+              <td>{a.created_by_name}</td>
+              {editable && (
+                <td className="right">
+                  {a.status !== 'archived' && <button type="button" className="btn sm" disabled={busy} onClick={() => archive(a)}>Archive</button>}
+                  <button type="button" className="btn sm danger" disabled={busy} onClick={() => remove(a)}>Delete</button>
+                </td>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table></div>
+    </>
+  );
+}
 
 export default function Settings() {
   const { can } = useAuth();
@@ -443,6 +525,7 @@ export default function Settings() {
             <Route path="numbering" element={<Numbering />} />
             <Route path="carriers" element={<Carriers />} />
             <Route path="email" element={<EmailSettings />} />
+            <Route path="announcements" element={<AnnouncementsAdmin />} />
             <Route path="integrations" element={<Integrations />} />
             <Route path="developer" element={<Developer />} />
             <Route path="users" element={<Users />} />

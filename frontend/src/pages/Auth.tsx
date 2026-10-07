@@ -38,6 +38,10 @@ export function Login() {
   const [f, setF] = useState({ email: '', password: '' });
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [signupOpen, setSignupOpen] = useState(false);
+  useEffect(() => {
+    api.get('/auth/signup-status').then((r) => setSignupOpen(!!r.open)).catch(() => setSignupOpen(false));
+  }, []);
   const submit = async (e) => {
     e.preventDefault();
     setBusy(true); setError(null);
@@ -50,7 +54,7 @@ export function Login() {
         <Field label="Email"><Input type="email" autoComplete="email" required value={f.email} onChange={(v) => setF({ ...f, email: v })} autoFocus /></Field>
         <Field label="Password"><Input type="password" autoComplete="current-password" required value={f.password} onChange={(v) => setF({ ...f, password: v })} /></Field>
         <button className="btn primary" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
-        <div className="small muted center">New here? <Link to="/signup">Create an organization</Link></div>
+        {signupOpen && <div className="small muted center">New here? <Link to="/signup">Create an organization</Link></div>}
         <div className="small faint center">Forgot your password? Ask your administrator for a password reset link (Settings → Users).</div>
       </form>
     </AuthShell>
@@ -63,12 +67,24 @@ export function Signup() {
   const [f, setF] = useState({ organization_name: '', name: '', email: '', password: '', country: 'India', state: 'Tamil Nadu', currency: 'INR', timezone: 'Asia/Kolkata' });
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [allowed, setAllowed] = useState(null);
   const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }));
+  useEffect(() => {
+    api.get('/auth/signup-status').then((r) => setAllowed(!!r.open)).catch(() => setAllowed(false));
+  }, []);
   const submit = async (e) => {
     e.preventDefault();
     setBusy(true); setError(null);
     try { startSession(await api.post('/auth/signup', f)); navigate('/'); } catch (err) { setError(err); } finally { setBusy(false); }
   };
+  if (allowed === null) return <AuthShell title="Create your organization"><Spinner /></AuthShell>;
+  if (!allowed) {
+    return (
+      <AuthShell title="Signup closed" subtitle="New organizations are created by our team.">
+        <p className="muted">Public signup is disabled. Contact us for an account, or <Link to="/login">sign in</Link> if you already have one.</p>
+      </AuthShell>
+    );
+  }
   return (
     <AuthShell title="Create your organization" subtitle="You will be the administrator of this organization.">
       <form className="stack" onSubmit={submit}>

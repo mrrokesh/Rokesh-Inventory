@@ -269,6 +269,8 @@ export async function insertItem(client: any, req: any, v: any, extra: any = {})
 }
 
 r.post('/', can('items', 'create'), async (req, res) => {
+  const { assertWithinLimit } = await import('../lib/plans.js');
+  await assertWithinLimit(req.orgId, 'items');
   const b = req.body || {};
   const v = await parseItem(b, req);
   const isComposite = bool(b.is_composite);

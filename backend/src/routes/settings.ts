@@ -10,13 +10,25 @@ import { imageUpload, removePublic } from '../lib/upload.js';
 import { formatNumber } from '../lib/numbering.js';
 import { emailLink } from './email.js';
 import { appUrl } from '../lib/mailer.js';
+import { assertWithinLimit, orgPlan, usageCounts } from '../lib/plans.js';
 
 const r = Router();
 
 // ------------------------------------------------------------ organization profile
 r.get('/organization', async (req, res) => {
-  const { rows } = await query('SELECT * FROM organizations WHERE id = $1', [req.orgId]);
+  const { rows } = await query(
+    `SELECT o.*, p.code AS plan_code, p.name AS plan_name, p.max_users, p.max_warehouses, p.max_items
+       FROM organizations o LEFT JOIN plans p ON p.id = o.plan_id
+      WHERE o.id = $1`,
+    [req.orgId],
+  );
   res.json(rows[0]);
+});
+
+r.get('/plan', async (req, res) => {
+  const plan = await orgPlan(req.orgId);
+  const usage = await usageCounts(req.orgId);
+  res.json({ ...(plan || {}), usage });
 });
 
 r.put('/organization', can('settings', 'edit'), async (req, res) => {
@@ -159,6 +171,7 @@ function parseWarehouse(b) {
 }
 
 r.post('/warehouses', can('settings', 'edit'), async (req, res) => {
+  await assertWithinLimit(req.orgId, 'warehouses');
   const v = parseWarehouse(req.body || {});
   const keys = Object.keys(v);
   const { rows } = await query(
@@ -298,6 +311,7 @@ async function checkRole(req, roleId) {
 }
 
 r.post('/users', requireAdmin, async (req, res) => {
+  await assertWithinLimit(req.orgId, 'users');
   const b = req.body || {};
   const roleId = id(b.role_id, { field: 'Role', required: true });
   await checkRole(req, roleId);

@@ -6,6 +6,7 @@ declare global {
       viaApiKey?: boolean;
       contact?: any;
       org?: any;
+      platformAdmin?: any;
     }
   }
 }

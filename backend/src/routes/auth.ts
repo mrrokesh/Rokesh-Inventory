@@ -6,6 +6,8 @@ import { HttpError, badRequest } from '../lib/errors.js';
 import { str, email } from '../lib/validate.js';
 import { setupOrganization } from '../lib/orgSetup.js';
 import { audit } from '../lib/audit.js';
+import { config } from '../config.js';
+import { orgAccessMessage } from '../lib/plans.js';
 
 const r = Router();
 
@@ -34,30 +36,46 @@ async function sessionPayload(userId) {
   const { rows } = await query(
     `SELECT u.id, u.name, u.email, u.org_id, r.id AS role_id, r.name AS role_name, r.is_admin, r.permissions,
             o.name AS org_name, o.currency, o.logo_path, o.gst_registered, o.date_format, o.state AS org_state, o.portal_slug,
+            o.status AS org_status, o.trial_ends_at, o.plan_id,
+            p.code AS plan_code, p.name AS plan_name, p.max_users, p.max_warehouses, p.max_items, p.modules AS plan_modules,
             (o.smtp IS NOT NULL) AS email_configured,
             COALESCE((SELECT array_agg(provider) FROM integrations WHERE org_id = o.id AND enabled), '{}') AS integrations
        FROM users u JOIN roles r ON r.id = u.role_id JOIN organizations o ON o.id = u.org_id
+       LEFT JOIN plans p ON p.id = o.plan_id
       WHERE u.id = $1`,
     [userId],
   );
   return rows[0];
 }
 
+r.get('/signup-status', (_req, res) => {
+  res.json({
+    mode: config.signupMode,
+    open: config.signupMode === 'open',
+  });
+});
+
 r.post('/signup', async (req, res) => {
+  if (config.signupMode !== 'open') {
+    throw new HttpError(403, 'Public signup is disabled. Contact us to get an account.');
+  }
   const b = req.body || {};
   const orgName = str(b.organization_name, { field: 'Organization name', required: true, max: 200 });
   const name = str(b.name, { field: 'Your name', required: true, max: 120 });
   const mail = email(b.email, { required: true });
   const pass = password(b.password);
   const hash = await bcrypt.hash(pass, 12);
+  const trialEnds = new Date(Date.now() + config.trialDays * 86400000);
   const userId = await tx(async (client) => {
     const exists = await client.query('SELECT 1 FROM users WHERE lower(email) = $1', [mail]);
     if (exists.rows.length) throw badRequest('An account with this email already exists. Sign in instead.');
+    const { rows: [starter] } = await client.query("SELECT id FROM plans WHERE code = 'starter' AND is_active LIMIT 1");
     const { rows: [org] } = await client.query(
-      `INSERT INTO organizations (name, legal_name, email, country, state, currency, timezone)
-       VALUES ($1, $1, $2, $3, $4, $5, $6) RETURNING id`,
+      `INSERT INTO organizations (name, legal_name, email, country, state, currency, timezone, status, plan_id, trial_ends_at)
+       VALUES ($1, $1, $2, $3, $4, $5, $6, 'trial', $7, $8) RETURNING id`,
       [orgName, mail, str(b.country, { field: 'Country' }) || 'India', str(b.state, { field: 'State' }),
-        str(b.currency, { field: 'Currency', max: 3 }) || 'INR', str(b.timezone, { field: 'Time zone' }) || 'Asia/Kolkata'],
+        str(b.currency, { field: 'Currency', max: 3 }) || 'INR', str(b.timezone, { field: 'Time zone' }) || 'Asia/Kolkata',
+        starter?.id || null, trialEnds],
     );
     const adminRoleId = await setupOrganization(client, org.id, { address: { state: b.state || '', country: b.country || 'India' } });
     const { rows: [user] } = await client.query(
@@ -75,13 +93,20 @@ r.post('/login', async (req, res) => {
   const mail = email(req.body?.email, { required: true });
   const pass = typeof req.body?.password === 'string' ? req.body.password : '';
   checkThrottle(mail);
-  const { rows } = await query('SELECT id, org_id, password_hash, status FROM users WHERE lower(email) = $1', [mail]);
+  const { rows } = await query(
+    `SELECT u.id, u.org_id, u.password_hash, u.status, o.status AS org_status, o.trial_ends_at
+       FROM users u JOIN organizations o ON o.id = u.org_id
+      WHERE lower(u.email) = $1`,
+    [mail],
+  );
   const user = rows[0];
   if (!user || !user.password_hash || !(await bcrypt.compare(pass, user.password_hash))) {
     recordFailure(mail);
     throw new HttpError(401, 'Incorrect email or password');
   }
   if (user.status !== 'active') throw new HttpError(403, 'Your account is inactive. Contact your administrator.');
+  const blocked = orgAccessMessage({ status: user.org_status, trial_ends_at: user.trial_ends_at });
+  if (blocked) throw new HttpError(403, blocked);
   failures.delete(mail);
   await query('UPDATE users SET last_login_at = now() WHERE id = $1', [user.id]);
   const session = await sessionPayload(user.id);
@@ -103,6 +128,15 @@ r.post('/invite/:token', async (req, res) => {
   const pass = password(req.body?.password);
   const name = str(req.body?.name, { field: 'Name', max: 120 });
   const hash = await bcrypt.hash(pass, 12);
+  const { rows: [pending] } = await query(
+    `SELECT u.id, o.status AS org_status, o.trial_ends_at
+       FROM users u JOIN organizations o ON o.id = u.org_id
+      WHERE u.invite_token = $1 AND u.status IN ('invited', 'active')`,
+    [req.params.token],
+  );
+  if (!pending) throw new HttpError(404, 'This invitation link is invalid or has already been used');
+  const blocked = orgAccessMessage({ status: pending.org_status, trial_ends_at: pending.trial_ends_at });
+  if (blocked) throw new HttpError(403, blocked);
   const { rows } = await query(
     `UPDATE users SET password_hash = $2, status = 'active', invite_token = NULL, name = COALESCE($3, name), last_login_at = now()
       WHERE invite_token = $1 AND status IN ('invited', 'active') RETURNING id`,
