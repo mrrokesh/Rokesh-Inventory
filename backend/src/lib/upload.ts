@@ -9,6 +9,10 @@ export const privateDir = path.join(config.uploadDir, 'private');
 export const publicDir = path.join(config.uploadDir, 'public');
 fs.mkdirSync(privateDir, { recursive: true });
 fs.mkdirSync(publicDir, { recursive: true });
+// Render sets RENDER=true. Only an attached persistent disk (mounted under /var/data in render.yaml) survives deploys.
+if (process.env.RENDER && !config.uploadDir.startsWith('/var/data')) {
+  console.warn(`WARNING: uploads are stored in ${config.uploadDir}, which Render wipes on every deploy. Attach a persistent disk (see render.yaml).`);
+}
 
 const DOC_TYPES = /^(application\/pdf|image\/(png|jpe?g|gif|webp)|text\/(plain|csv)|application\/(msword|vnd\.openxmlformats-officedocument\.[a-z.]+|vnd\.ms-excel|vnd\.oasis\.opendocument\.[a-z.]+|zip|x-zip-compressed))$/;
 const IMAGE_TYPES = /^image\/(png|jpe?g|gif|webp)$/;

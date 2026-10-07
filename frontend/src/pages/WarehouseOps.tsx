@@ -8,6 +8,7 @@ import DataTable from '../components/DataTable';
 import { ItemPicker } from '../components/Pickers';
 import { BackLink, Badge, ErrorBox, Field, Input, PageHead, Select, Spinner, Textarea, confirmDialog, useAction, useApi } from '../components/ui';
 import { useToast } from '../components/Toast';
+import { TrackingButton, TrackingModal } from '../components/Tracking';
 
 let k = 0;
 
@@ -81,7 +82,7 @@ export function StockCountForm() {
         <div className="card mb">
           <div className="card-head"><h3>Items to count</h3></div>
           <div className="card-body">
-            <ItemPicker onSelect={addLine} placeholder="Add item" params={{ track_inventory: 'true' }} />
+            <ItemPicker onSelect={addLine} placeholder="Add item" params={{ tracked: 'true' }} />
             <table className="table" style={{ marginTop: 12 }}>
               <thead><tr><th>Item</th><th /></tr></thead>
               <tbody>{lines.map((l) => (
@@ -108,6 +109,7 @@ export function StockCountDetail() {
   const [busy, run] = useAction(toast);
   const { data: sc, error, reload } = useApi(`/stock-counts/${id}`);
   const [lines, setLines] = useState<any[]>([]);
+  const [trackLine, setTrackLine] = useState<any>(null);
   useEffect(() => { if (sc) setLines(sc.lines.map((l) => ({ ...l, counted_qty: l.counted_qty ?? '' }))); }, [sc]);
   if (error) return <div className="page"><ErrorBox error={error} /></div>;
   if (!sc) return <div className="page"><Spinner /></div>;
@@ -145,14 +147,20 @@ export function StockCountDetail() {
         <dt>Created by</dt><dd>{sc.created_by_name}</dd>
       </dl></div></div>
       <div className="card"><table className="table">
-        <thead><tr><th>Item</th><th className="num">System qty</th><th className="num">Counted</th><th className="num">Difference</th></tr></thead>
+        <thead><tr><th>Item</th><th className="num">{open ? 'In stock now' : 'System qty'}</th><th className="num">Counted</th><th className="num">Difference</th></tr></thead>
         <tbody>{lines.map((l) => {
           const counted = l.counted_qty === '' || l.counted_qty === null ? null : Number(l.counted_qty);
-          const diff = counted === null ? null : counted - Number(l.system_qty);
+          const diff = counted === null ? null : counted - Number(l.current_qty);
+          const tracked = l.item_tracking && l.item_tracking !== 'none';
           return (
             <tr key={l.id}>
-              <td><Link to={`/items/${l.item_id}`}>{l.item_name}</Link> <span className="faint small">{l.item_sku}</span></td>
-              <td className="num">{qty(l.system_qty)} {l.item_unit}</td>
+              <td><Link to={`/items/${l.item_id}`}>{l.item_name}</Link> <span className="faint small">{l.item_sku}</span>
+                {open && tracked && diff !== null && diff !== 0 && (
+                  <TrackingButton mode={l.item_tracking} direction={diff > 0 ? 'in' : 'out'} required={diff > 0} value={l.tracking} onClick={() => setTrackLine(l)} />
+                )}
+                {!open && l.tracking && <div className="small mono faint">{(l.tracking.serials || l.tracking.batches?.map((b) => `${b.batch_no} × ${b.quantity}`) || []).join(', ')}</div>}
+              </td>
+              <td className="num">{qty(l.current_qty)} {l.item_unit}</td>
               <td className="num" style={{ width: 140 }}>
                 {open ? <input className="input num" type="number" step="any" value={l.counted_qty} onChange={(e) => setLines((cur) => cur.map((x) => (x.id === l.id ? { ...x, counted_qty: e.target.value } : x)))} /> : qty(l.counted_qty ?? 0)}
               </td>
@@ -163,6 +171,15 @@ export function StockCountDetail() {
           );
         })}</tbody>
       </table></div>
+      {open && <p className="small faint">"In stock now" updates live: sales or receipts during the count are taken into account, so completing sets stock exactly to what you counted.</p>}
+      {trackLine && (() => {
+        const diff = Number(trackLine.counted_qty) - Number(trackLine.current_qty);
+        return (
+          <TrackingModal itemId={trackLine.item_id} itemName={trackLine.item_name} mode={trackLine.item_tracking} direction={diff > 0 ? 'in' : 'out'}
+            quantity={Math.abs(diff)} warehouseId={sc.warehouse_id} value={trackLine.tracking} onClose={() => setTrackLine(null)}
+            onSave={(v) => { setLines((cur) => cur.map((x) => (x.id === trackLine.id ? { ...x, tracking: v } : x))); setTrackLine(null); }} />
+        );
+      })()}
     </div>
   );
 }

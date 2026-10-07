@@ -6,13 +6,22 @@ services:
     buildCommand: npm ci
     startCommand: npx tsx src/server.ts
     healthCheckPath: /api/health
+    # IMPORTANT — uploaded files (logos, item images, attachments) are saved to disk.
+    # Render's normal disk is wiped on every deploy/restart, so uploads would disappear.
+    # To keep them, use a paid instance (Starter or above) and uncomment `plan` and `disk`,
+    # then change UPLOAD_DIR below to /var/data/uploads.
+    # plan: starter
+    # disk:
+    #   name: uploads
+    #   mountPath: /var/data
+    #   sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
       - key: JWT_EXPIRES_IN
         value: 7d
       - key: UPLOAD_DIR
-        value: uploads
+        value: uploads            # with the disk enabled: /var/data/uploads
       - key: DATABASE_URL
         sync: false
       - key: JWT_SECRET
@@ -22,4 +31,10 @@ services:
       - key: APP_URL
         sync: false
       - key: APP_SECRET
+        sync: false
+      - key: SIGNUP_MODE
+        value: invite_only
+      - key: PLATFORM_ADMIN_EMAIL
+        sync: false
+      - key: PLATFORM_ADMIN_PASSWORD
         sync: false

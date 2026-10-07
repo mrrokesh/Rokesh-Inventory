@@ -53,12 +53,17 @@ async function fetchStockCount(db, orgId, countId, lock = false) {
     [orgId, countId],
   );
   if (!rows[0]) throw notFound('Stock count');
+  // While a count is open, compare against the stock on hand *now* (sales and receipts may happen
+  // during the count). Once completed, system_qty holds the quantity the adjustment was based on.
+  const open = ['draft', 'in_progress'].includes(rows[0].status);
   const { rows: lines } = await db.query(
-    `SELECT l.*, i.name AS item_name, i.sku AS item_sku, i.unit AS item_unit,
-            (l.counted_qty - l.system_qty) AS difference
+    `SELECT l.*, i.name AS item_name, i.sku AS item_sku, i.unit AS item_unit, i.tracking AS item_tracking,
+            ${open ? 'COALESCE(sl.on_hand, 0)' : 'l.system_qty'} AS current_qty,
+            (l.counted_qty - ${open ? 'COALESCE(sl.on_hand, 0)' : 'l.system_qty'}) AS difference
        FROM stock_count_lines l JOIN items i ON i.id = l.item_id
+       LEFT JOIN stock_levels sl ON sl.item_id = l.item_id AND sl.warehouse_id = $2
       WHERE l.stock_count_id = $1 ORDER BY l.position, l.id`,
-    [countId],
+    [countId, rows[0].warehouse_id],
   );
   return { ...rows[0], lines };
 }
@@ -143,10 +148,10 @@ stockCounts.put('/:id', can('inventory', 'edit'), async (req, res) => {
         if (!lineId) continue;
         const counted = l.counted_qty === '' || l.counted_qty === null || l.counted_qty === undefined
           ? null
-          : round3(num(l.counted_qty, { field: 'Counted quantity' }));
+          : round3(num(l.counted_qty, { field: 'Counted quantity', min: 0 }));
         await client.query(
-          'UPDATE stock_count_lines SET counted_qty = $3 WHERE id = $1 AND stock_count_id = $2',
-          [lineId, cur.id, counted],
+          'UPDATE stock_count_lines SET counted_qty = $3, tracking = $4 WHERE id = $1 AND stock_count_id = $2',
+          [lineId, cur.id, counted, l.tracking ? JSON.stringify(l.tracking) : null],
         );
       }
     }
@@ -160,7 +165,24 @@ stockCounts.post('/:id/complete', can('inventory', 'approve'), async (req, res) 
   const result = await tx(async (client) => {
     const sc = await fetchStockCount(client, req.orgId, Number(req.params.id), true);
     if (!['draft', 'in_progress'].includes(sc.status)) throw conflict('This stock count is already completed or cancelled');
+    // Re-read stock on hand under lock so the adjustment brings stock exactly to the counted quantity,
+    // even if goods moved while the count was in progress.
+    for (const l of sc.lines) {
+      const { rows: [lvl] } = await client.query(
+        'SELECT on_hand FROM stock_levels WHERE item_id = $1 AND warehouse_id = $2 FOR UPDATE',
+        [l.item_id, sc.warehouse_id],
+      );
+      const onHand = round3(Number(lvl?.on_hand ?? 0));
+      l.current_qty = onHand;
+      l.difference = l.counted_qty === null ? null : round3(Number(l.counted_qty) - onHand);
+      await client.query('UPDATE stock_count_lines SET system_qty = $2 WHERE id = $1', [l.id, onHand]);
+    }
     const diffs = sc.lines.filter((l) => l.counted_qty !== null && Number(l.difference) !== 0);
+    const missing = diffs.find((l) => l.item_tracking !== 'none' && Number(l.difference) > 0 && !l.tracking);
+    if (missing) {
+      const what = missing.item_tracking === 'serial' ? 'serial numbers' : 'batch details';
+      throw badRequest(`${missing.item_name}: you counted ${Number(missing.difference)} more than in stock. Add the ${what} for the extra units before completing.`);
+    }
     let adjustmentId = null;
     if (diffs.length) {
       const number = await takeNumber(client, req.orgId, 'inventory_adjustment');
@@ -176,12 +198,12 @@ stockCounts.post('/:id/complete', can('inventory', 'approve'), async (req, res) 
       for (const l of diffs) {
         const qtyAdj = round3(Number(l.difference));
         await client.query(
-          `INSERT INTO inventory_adjustment_lines (adjustment_id, item_id, qty_adjusted, unit_cost, value_adjusted, position)
-           VALUES ($1,$2,$3,$4,0,$5)`,
-          [adj.id, l.item_id, qtyAdj, qtyAdj > 0 ? items.get(l.item_id).cost_price : null, pos++],
+          `INSERT INTO inventory_adjustment_lines (adjustment_id, item_id, qty_adjusted, unit_cost, value_adjusted, tracking, position)
+           VALUES ($1,$2,$3,$4,0,$5,$6)`,
+          [adj.id, l.item_id, qtyAdj, qtyAdj > 0 ? items.get(l.item_id).cost_price : null, l.tracking ? JSON.stringify(l.tracking) : null, pos++],
         );
         const base = {
-          itemId: l.item_id, warehouseId: sc.warehouse_id, date: sc.count_date,
+          itemId: l.item_id, warehouseId: sc.warehouse_id, date: sc.count_date, tracking: l.tracking || undefined,
           sourceType: 'inventory_adjustment', sourceId: adj.id, sourceNumber: number, note: `Stock count ${sc.number}`,
         };
         if (qtyAdj > 0) await stockIn(client, ctx, { ...base, qty: qtyAdj, unitCost: items.get(l.item_id).cost_price });
@@ -284,18 +306,37 @@ picklists.post('/', can('packages', 'create'), async (req, res) => {
         WHERE l.doc_id = $1 ORDER BY l.position, l.id`,
       [soId],
     );
+    // Quantities already on other open (not yet picked) picklists for this order, so two picklists
+    // can't send pickers after the same goods.
+    const { rows: openRows } = await client.query(
+      `SELECT pl.sales_order_line_id, SUM(pl.quantity_to_pick) AS qty
+         FROM picklist_lines pl JOIN picklists p ON p.id = pl.picklist_id
+        WHERE p.sales_order_id = $1 AND p.status = 'draft' AND pl.sales_order_line_id IS NOT NULL
+        GROUP BY pl.sales_order_line_id`,
+      [soId],
+    );
+    const onOpenPicklists = new Map(openRows.map((r) => [Number(r.sales_order_line_id), Number(r.qty)]));
+    const remaining = (l) => round3(Number(l.quantity) - Number(l.qty_packed || 0) - (onOpenPicklists.get(Number(l.id)) || 0));
     const lines = Array.isArray(b.lines) && b.lines.length
-      ? b.lines.map((l, i) => ({
-        item_id: id(l.item_id, { field: `Line ${i + 1} item`, required: true }),
-        sales_order_line_id: id(l.sales_order_line_id, { field: 'Sales order line' }),
-        quantity_to_pick: round3(num(l.quantity_to_pick, { field: `Line ${i + 1} quantity`, required: true, min: 0.001 })),
-      }))
-      : soLines.filter((l) => l.track_inventory && Number(l.quantity) - Number(l.qty_packed || 0) > 0).map((l) => ({
+      ? b.lines.map((l, i) => {
+        const line = {
+          item_id: id(l.item_id, { field: `Line ${i + 1} item`, required: true }),
+          sales_order_line_id: id(l.sales_order_line_id, { field: 'Sales order line' }),
+          quantity_to_pick: round3(num(l.quantity_to_pick, { field: `Line ${i + 1} quantity`, required: true, min: 0.001 })),
+        };
+        const sol = line.sales_order_line_id && soLines.find((s) => Number(s.id) === line.sales_order_line_id);
+        if (line.sales_order_line_id && !sol) throw badRequest(`Line ${i + 1} does not belong to this sales order`);
+        if (sol && line.quantity_to_pick > remaining(sol) + 0.0005) {
+          throw badRequest(`${sol.item_name}: only ${Math.max(0, remaining(sol))} left to pick (the rest is packed or on another open picklist)`);
+        }
+        return line;
+      })
+      : soLines.filter((l) => l.track_inventory && remaining(l) > 0).map((l) => ({
         item_id: l.item_id,
         sales_order_line_id: l.id,
-        quantity_to_pick: round3(Number(l.quantity) - Number(l.qty_packed || 0)),
+        quantity_to_pick: remaining(l),
       }));
-    if (!lines.length) throw badRequest('Nothing left to pick on this sales order');
+    if (!lines.length) throw badRequest('Nothing left to pick on this sales order — it is fully packed or already on an open picklist');
 
     const number = await takeNumber(client, req.orgId, 'picklist', b.number);
     const { rows: [pl] } = await client.query(

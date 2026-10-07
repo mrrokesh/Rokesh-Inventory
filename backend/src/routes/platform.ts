@@ -21,17 +21,40 @@ function password(v) {
 }
 
 // ------------------------------------------------------------------ auth (public)
+// Lock out an email (and, separately, an IP address) after 10 failed attempts in 15 minutes.
+const WINDOW_MS = 15 * 60 * 1000;
+const MAX_FAILURES = 10;
+const failures = new Map<string, { count: number; first: number }>();
+function isLocked(key: string) {
+  const f = failures.get(key);
+  if (!f) return false;
+  if (Date.now() - f.first > WINDOW_MS) { failures.delete(key); return false; }
+  return f.count >= MAX_FAILURES;
+}
+function recordFailure(key: string) {
+  const f = failures.get(key);
+  if (!f || Date.now() - f.first > WINDOW_MS) failures.set(key, { count: 1, first: Date.now() });
+  else f.count += 1;
+}
+
 r.post('/auth/login', async (req, res) => {
   const mail = email(req.body?.email, { required: true });
   const pass = typeof req.body?.password === 'string' ? req.body.password : '';
+  const keys = [`email:${mail}`, `ip:${req.ip}`];
+  if (keys.some(isLocked)) {
+    throw new HttpError(429, 'Too many failed sign-in attempts. Try again in 15 minutes.');
+  }
   const { rows } = await query(
     'SELECT id, name, email, password_hash, status FROM platform_admins WHERE lower(email) = $1',
     [mail],
   );
   const admin = rows[0];
   if (!admin || !(await bcrypt.compare(pass, admin.password_hash))) {
+    keys.forEach(recordFailure);
+    await platformAudit(admin?.id ?? null, 'login_failed', 'platform_admin', admin?.id ?? null, `Failed platform sign-in for ${mail} from ${req.ip}`);
     throw new HttpError(401, 'Incorrect email or password');
   }
+  failures.delete(`email:${mail}`);
   if (admin.status !== 'active') throw new HttpError(403, 'Your platform account is inactive');
   await query('UPDATE platform_admins SET last_login_at = now() WHERE id = $1', [admin.id]);
   await platformAudit(admin.id, 'login', 'platform_admin', admin.id, 'Platform admin signed in');
