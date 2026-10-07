@@ -4,6 +4,7 @@ import { can } from '../middleware/auth.js';
 import { audit } from '../lib/audit.js';
 import { badRequest, conflict, notFound } from '../lib/errors.js';
 import { str, num, int, id, email, obj, oneOf, listParams } from '../lib/validate.js';
+import { cfInput, parseCustomFields } from '../lib/customFields.js';
 
 /** Never send portal credentials to the browser. */
 const safe = ({ portal_password_hash: _h, portal_token: _t, ...rest }: any) => rest;
@@ -55,7 +56,7 @@ export function contactsRouter(type) {
     res.json({ ...safe(rows[0]), contact_persons: persons });
   });
 
-  async function parse(b, req) {
+  async function parse(b, req, existing = null) {
     const gstTreatment = b.gst_treatment ? oneOf(b.gst_treatment, GST_TREATMENTS, { field: 'GST treatment' }) : null;
     const gstin = str(b.gstin, { field: 'GSTIN', max: 15 });
     if (gstin && !/^[0-9]{2}[A-Z0-9]{13}$/.test(gstin.toUpperCase())) throw badRequest('GSTIN must be 15 characters (e.g. 33ABCDE1234F1Z5)');
@@ -92,6 +93,7 @@ export function contactsRouter(type) {
       shipping_address: JSON.stringify(obj(b.shipping_address)),
       notes: str(b.notes, { field: 'Remarks', max: 5000 }),
       status: oneOf(b.status, ['active', 'inactive'], { field: 'Status', def: 'active' }),
+      custom_fields: JSON.stringify(await parseCustomFields({ query }, req.orgId, type, cfInput(b), existing?.custom_fields)),
     };
   }
 
@@ -123,7 +125,8 @@ export function contactsRouter(type) {
   });
 
   r.put('/:id', can(M, 'edit'), async (req, res) => {
-    const v = await parse(req.body || {}, req);
+    const { rows: [current] } = await query('SELECT custom_fields FROM contacts WHERE org_id = $1 AND id = $2', [req.orgId, Number(req.params.id)]);
+    const v = await parse(req.body || {}, req, current);
     const updated = await tx(async (client) => {
       const keys = Object.keys(v);
       const { rows } = await client.query(

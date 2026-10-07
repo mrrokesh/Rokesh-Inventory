@@ -3,7 +3,8 @@ import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../auth';
 import { label } from '../lib/format';
-import { getTheme, setTheme } from '../lib/theme';
+import { applyBrandColor, getTheme, setTheme } from '../lib/theme';
+import { useLookups } from '../lib/lookups';
 import { helpSlugFor } from '../pages/help/index';
 import { APP_NAME, LOGO_SRC } from '../brand';
 import Icon from './Icon';
@@ -249,6 +250,8 @@ export default function Layout({ children }: any) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [themePref, setThemePref] = useState(getTheme());
+  const { organization } = useLookups('organization');
+  useEffect(() => { applyBrandColor(organization?.brand_color); }, [organization?.brand_color]);
   const initials = (user?.name || '?').split(' ').map((s) => s[0]).slice(0, 2).join('').toUpperCase();
   return (
     <div className="app">

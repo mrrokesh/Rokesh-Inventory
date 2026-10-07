@@ -7,12 +7,13 @@ import { ContactPicker, ItemPicker } from '../../components/Pickers';
 import { BackLink, Checkbox, ErrorBox, FormRow, Input, PageHead, Select, Spinner, Textarea, useApi } from '../../components/ui';
 import { useToast } from '../../components/Toast';
 import { TrackingButton, TrackingModal } from '../../components/Tracking';
+import { CustomFieldInputs } from '../../components/CustomFields';
 
 const EMPTY = {
   name: '', sku: '', barcode: '', item_type: 'goods', unit: 'pcs', category: '', brand: '', manufacturer: '', description: '', hsn_sac: '',
   selling_price: '', cost_price: '', sales_description: '', purchase_description: '', sales_tax_id: '', purchase_tax_id: '',
   preferred_vendor_id: '', preferred_vendor_name: '', track_inventory: true, reorder_level: '', returnable: true,
-  length_cm: '', width_cm: '', height_cm: '', weight_kg: '', status: 'active', tracking: 'none',
+  length_cm: '', width_cm: '', height_cm: '', weight_kg: '', status: 'active', tracking: 'none', custom_fields: {},
 };
 
 export default function ItemForm({ composite: compositeProp = false }: any) {
@@ -233,6 +234,7 @@ export default function ItemForm({ composite: compositeProp = false }: any) {
               <FormRow label="Weight (kg)"><Input type="number" min="0" step="any" value={f.weight_kg} onChange={set('weight_kg')} /></FormRow>
             </div>
           )}
+          <CustomFieldInputs entity="item" value={f.custom_fields} onChange={set('custom_fields')} isNew={!editing} />
         </div></div>
       </div>
       {trackRow !== null && (

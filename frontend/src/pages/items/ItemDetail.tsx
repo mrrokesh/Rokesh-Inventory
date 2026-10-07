@@ -8,6 +8,7 @@ import { Badge, Dropdown, ErrorBox, Modal, PageHead, Spinner, Tabs, confirmDialo
 import { Attachments, History } from '../../components/Attachments';
 import { useToast } from '../../components/Toast';
 import { stockBadge } from './ItemsList';
+import { CustomFieldValues } from '../../components/CustomFields';
 
 const SOURCE_LINKS = {
   shipment: (id) => `/shipments/${id}`, invoice: (id) => `/invoices/${id}`, purchase_receive: (id) => `/purchase-receives/${id}`,
@@ -191,6 +192,7 @@ export default function ItemDetail() {
                 {it.tracking !== 'none' && <><dt>Tracked by</dt><dd>{it.tracking === 'serial' ? 'Serial number' : 'Batch & expiry'}</dd></>}
                 {(it.length_cm || it.weight_kg) && <><dt>Dimensions / weight</dt><dd>{[it.length_cm, it.width_cm, it.height_cm].filter(Boolean).join(' × ')} {it.length_cm ? 'cm' : ''} {it.weight_kg ? `· ${it.weight_kg} kg` : ''}</dd></>}
                 {it.description && <><dt>Description</dt><dd style={{ whiteSpace: 'pre-wrap' }}>{it.description}</dd></>}
+                <CustomFieldValues entity="item" values={it.custom_fields} />
               </dl>
             </div></div>
             <div className="grid-2">

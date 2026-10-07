@@ -9,6 +9,7 @@ import { peekNumber, takeNumber } from '../lib/numbering.js';
 import { parseLines, loadTaxRates, computeTotals, insertLines, fetchDoc, getContact, getWarehouse } from '../lib/documents.js';
 import { str, num, id, date, today, listParams } from '../lib/validate.js';
 import { loadItems } from '../lib/stock.js';
+import { cfInput, parseCustomFields } from '../lib/customFields.js';
 
 export function createDocRouter(cfg) {
   const r = Router();
@@ -77,6 +78,7 @@ export function createDocRouter(cfg) {
       notes: str(b.notes, { field: 'Notes', max: 5000 }),
       terms: str(b.terms, { field: 'Terms & Conditions', max: 5000 }),
       ...(cfg.header ? cfg.header(b, contact, existing) : {}),
+      custom_fields: await parseCustomFields(client, req.orgId, cfg.entity, cfInput(b), existing?.custom_fields),
     };
     const lines = parseLines(b.lines, { allowNoItem: cfg.allowNoItem !== false, extra: cfg.lineExtra || [] });
     const items = await loadItems(client, req.orgId, lines.map((l) => l.item_id));

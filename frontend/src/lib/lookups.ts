@@ -16,7 +16,11 @@ const SOURCES = {
   units: '/settings/units',
   carriers: '/settings/carriers',
   organization: '/settings/organization',
+  templates: '/settings/templates',
+  customFields: '/settings/custom-fields?active=true',
 };
+
+const OBJECT_KEYS = new Set(['organization', 'templates']);
 
 async function load(key) {
   if (!cache[key]) cache[key] = api.get(SOURCES[key]).catch((err) => { delete cache[key]; throw err; });
@@ -25,7 +29,7 @@ async function load(key) {
 
 /** useLookups('taxes', 'warehouses') -> { taxes: [...], warehouses: [...] } (empty arrays while loading) */
 export function useLookups(...keys) {
-  const [data, setData] = useState(() => Object.fromEntries(keys.map((k) => [k, k === 'organization' ? null : []])));
+  const [data, setData] = useState(() => Object.fromEntries(keys.map((k) => [k, OBJECT_KEYS.has(k) ? null : []])));
   const [version, setVersion] = useState(0);
   useEffect(() => {
     const fn = () => setVersion((v) => v + 1);
@@ -34,7 +38,7 @@ export function useLookups(...keys) {
   }, []);
   useEffect(() => {
     let alive = true;
-    Promise.all(keys.map((k) => load(k).catch(() => (k === 'organization' ? null : []))))
+    Promise.all(keys.map((k) => load(k).catch(() => (OBJECT_KEYS.has(k) ? null : []))))
       .then((vals) => { if (alive) setData(Object.fromEntries(keys.map((k, i) => [k, vals[i]]))); });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps

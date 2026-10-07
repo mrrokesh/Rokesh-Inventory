@@ -7,6 +7,7 @@ import { str, num, id, bool, obj, oneOf, date, today, listParams, round3 } from 
 import { imageUpload, removePublic } from '../lib/upload.js';
 import { stockIn, ctxOf, loadItems } from '../lib/stock.js';
 import { getWarehouse } from '../lib/documents.js';
+import { cfInput, parseCustomFields } from '../lib/customFields.js';
 
 const r = Router();
 
@@ -221,6 +222,7 @@ export async function parseItem(b: any, req: any, existing?: any) {
     weight_kg: num(b.weight_kg, { field: 'Weight', min: 0 }),
     attributes: JSON.stringify(obj(b.attributes)),
     status: oneOf(b.status, ['active', 'inactive'], { field: 'Status', def: 'active' }),
+    custom_fields: JSON.stringify(await parseCustomFields({ query }, req.orgId, 'item', cfInput(b), existing?.custom_fields)),
   };
 }
 

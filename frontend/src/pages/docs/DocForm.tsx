@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../../api';
 import { useLookups } from '../../lib/lookups';
@@ -8,6 +8,7 @@ import { useAuth } from '../../auth';
 import { ContactPicker, ItemPicker } from '../../components/Pickers';
 import { BackLink, Checkbox, ErrorBox, Field, Input, PageHead, Select, Spinner, Textarea } from '../../components/ui';
 import { useToast } from '../../components/Toast';
+import { CustomFieldInputs } from '../../components/CustomFields';
 import { BILL_ACCOUNTS, computeTotals } from './config';
 
 let lineSeq = 0;
@@ -25,13 +26,13 @@ export default function DocForm({ cfg }: any) {
   const [sp] = useSearchParams();
   const navigate = useNavigate();
   const toast = useToast();
-  const { taxes, warehouses } = useLookups('taxes', 'warehouses');
+  const { taxes, warehouses, templates } = useLookups('taxes', 'warehouses', 'templates');
   const [contact, setContact] = useState(null);
   const [h, setH] = useState({
     number: '', reference: '', doc_date: today(), warehouse_id: '', discount_percent: 0, shipping_charge: '', adjustment: '', notes: '', terms: '',
     payment_terms: 0, due_date: '', expected_shipment_date: '', expected_delivery_date: '', delivery_method: '', salesperson: '', shipment_preference: '',
     return_stock: false, sales_order_id: null, purchase_order_id: null, invoice_id: null, sales_return_id: null, bill_id: null,
-    delivery_challan_id: null, place_of_supply: '', expiry_date: '', challan_type: 'supply_on_approval',
+    delivery_challan_id: null, place_of_supply: '', expiry_date: '', challan_type: 'supply_on_approval', custom_fields: {},
   });
   const { user } = useAuth();
   const [trackFor, setTrackFor] = useState(null);
@@ -147,6 +148,15 @@ export default function DocForm({ cfg }: any) {
     }
   }, [warehouses, h.warehouse_id]);
 
+  // New documents start with the template's default notes and terms (Settings → Templates).
+  const defaultsApplied = useRef(false);
+  useEffect(() => {
+    const t = templates?.[cfg.entity];
+    if (editing || loading || !t || defaultsApplied.current || sp.get('clone')) return;
+    defaultsApplied.current = true;
+    setH((x) => ({ ...x, notes: x.notes || t.default_notes || '', terms: x.terms || t.default_terms || '' }));
+  }, [templates, editing, loading, cfg.entity, sp]);
+
   // Due date follows invoice/bill date + terms unless the user edited it.
   const [dueTouched, setDueTouched] = useState(false);
   useEffect(() => {
@@ -255,6 +265,7 @@ export default function DocForm({ cfg }: any) {
               </Field>
             )}
           </div>
+          <CustomFieldInputs entity={cfg.entity} value={h.custom_fields} onChange={set('custom_fields')} layout="grid" isNew={!editing} title="" />
         </div></div>
 
         <div className="card mb">

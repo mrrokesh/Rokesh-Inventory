@@ -11,11 +11,24 @@ import Icon from '../../components/Icon';
 import { ApplyCreditModal, PackageModal, ReceiveModal, RefundModal, ReturnModal } from './Modals';
 import { CHALLAN_TYPES } from './config';
 import { Comments, EmailModal } from '../../components/Comms';
+import { CustomFieldValues } from '../../components/CustomFields';
 
 const EMAILABLE = ['estimates', 'sales_orders', 'invoices', 'credit_notes', 'delivery_challans', 'purchase_orders', 'vendor_credits'];
 
+export const TEMPLATE_DEFAULTS = {
+  layout: 'standard', accent_color: '', title: '', show_logo: true, show_org_address: true, show_sku: true, show_hsn: true, show_discount: true,
+  show_tax_column: true, show_unit: true, show_custom_fields: true, show_signature: true, signature_label: 'Authorised Signatory',
+  header_note: '', footer_note: '', bank_details: '', default_notes: '', default_terms: '', font_size: 'normal',
+};
+
+// Links are plain text in template previews (sample data has no real records).
+const DocLink = ({ to, preview, children }: any) => (preview ? <>{children}</> : <Link to={to}>{children}</Link>);
+
 /** Printable document body (shared look for all priced documents). */
-export function DocPaper({ cfg, doc, org }: any) {
+export function DocPaper({ cfg, doc, org, template = null, preview = false }: any) {
+  const { templates } = useLookups('templates');
+  const t = { ...TEMPLATE_DEFAULTS, ...(template || templates?.[cfg.entity] || {}) };
+  const accent = t.accent_color || org?.brand_color || '';
   const terms = PAYMENT_TERMS.find((p) => p[0] === doc.payment_terms)?.[1];
   // GST: same state as the organization → CGST + SGST; another state → IGST.
   const gstMode = org?.gst_registered && org?.state;
@@ -28,31 +41,36 @@ export function DocPaper({ cfg, doc, org }: any) {
     const parts = !gstMode ? [[`${l.tax_name || 'Tax'} (${r}%)`, tax]] : inter ? [[`IGST (${r}%)`, tax]] : [[`CGST (${r / 2}%)`, tax / 2], [`SGST (${r / 2}%)`, tax / 2]];
     for (const [k, v] of parts) taxBreak.set(k, (taxBreak.get(k) || 0) + v);
   }
-  const showHsn = doc.lines.some((l) => l.hsn_sac);
+  const showHsn = t.show_hsn && doc.lines.some((l) => l.hsn_sac);
+  const showDisc = t.show_discount && doc.lines.some((l) => Number(l.discount_percent));
   const orgAddr = addressLines(org?.address);
+  const style: any = { fontSize: { small: 12, normal: 14, large: 15.5 }[t.font_size] };
+  if (accent) style['--doc-accent'] = accent;
   return (
-    <div className="doc-paper">
+    <div className={`doc-paper doc-${t.layout}${accent ? ' doc-accented' : ''}`} style={style}>
+      {t.layout === 'modern' && <div className="doc-band" />}
       <div className="row" style={{ alignItems: 'flex-start' }}>
         <div>
-          {org?.logo_path && <img src={mediaUrl(org.logo_path)} alt="" style={{ maxHeight: 60, maxWidth: 200, marginBottom: 8 }} />}
-          <div className="bold" style={{ fontSize: 15 }}>{org?.legal_name || org?.name}</div>
-          {orgAddr.map((l) => <div key={l} className="small muted">{l}</div>)}
+          {t.show_logo && org?.logo_path && <img src={mediaUrl(org.logo_path)} alt="" style={{ maxHeight: 60, maxWidth: 200, marginBottom: 8 }} />}
+          <div className="bold" style={{ fontSize: '1.07em' }}>{org?.legal_name || org?.name}</div>
+          {t.show_org_address && orgAddr.map((l) => <div key={l} className="small muted">{l}</div>)}
           {org?.gstin && <div className="small muted">GSTIN {org.gstin}</div>}
-          {org?.email && <div className="small muted">{org.email}</div>}
+          {t.show_org_address && org?.email && <div className="small muted">{org.email}</div>}
         </div>
         <div className="spacer" />
         <div className="right">
-          <div className="doc-title">{cfg.printTitle}</div>
+          <div className="doc-title">{t.title || cfg.printTitle}</div>
           <div className="bold"># {doc.number}</div>
           {cfg.hasBalance && doc.status !== 'draft' && <div className="mt small muted">Balance due</div>}
           {cfg.hasBalance && doc.status !== 'draft' && <div className="bold" style={{ fontSize: 18 }}>{money(doc.balance)}</div>}
           {cfg.hasCredit && doc.status !== 'draft' && <><div className="mt small muted">Credits remaining</div><div className="bold" style={{ fontSize: 18 }}>{money(doc.balance)}</div></>}
         </div>
       </div>
-      <div className="row mt" style={{ alignItems: 'flex-start', marginTop: 28 }}>
+      {t.header_note && <div className="doc-note mt" style={{ whiteSpace: 'pre-wrap' }}>{t.header_note}</div>}
+      <div className="row mt" style={{ alignItems: 'flex-start', marginTop: t.layout === 'compact' ? 16 : 28 }}>
         <div style={{ flex: 1 }}>
           <div className="small muted">{cfg.contactType === 'customer' ? 'Bill to' : 'Vendor'}</div>
-          <div className="bold"><Link to={`/${cfg.contactType}s/${doc.contact_id}`}>{doc.contact_name}</Link></div>
+          <div className="bold"><DocLink preview={preview} to={`/${cfg.contactType}s/${doc.contact_id}`}>{doc.contact_name}</DocLink></div>
           {addressLines(doc.billing_address && Object.keys(doc.billing_address).length ? doc.billing_address : doc.contact_billing_address).map((l) => <div key={l} className="small">{l}</div>)}
         </div>
         {cfg.addresses && (
@@ -68,7 +86,7 @@ export function DocPaper({ cfg, doc, org }: any) {
           {doc.contact_gstin && <><dt>Customer GSTIN</dt><dd className="mono">{doc.contact_gstin}</dd></>}
           {doc.expiry_date && <><dt>Valid until</dt><dd>{date(doc.expiry_date)}</dd></>}
           {doc.challan_type && <><dt>Challan type</dt><dd>{CHALLAN_TYPES.find((t) => t[0] === doc.challan_type)?.[1]}</dd></>}
-          {doc.delivery_challan_number && <><dt>Delivery challan</dt><dd><Link to={`/delivery-challans/${doc.delivery_challan_id}`}>{doc.delivery_challan_number}</Link></dd></>}
+          {doc.delivery_challan_number && <><dt>Delivery challan</dt><dd><DocLink preview={preview} to={`/delivery-challans/${doc.delivery_challan_id}`}>{doc.delivery_challan_number}</DocLink></dd></>}
           {doc.channel && doc.channel !== 'direct' && <><dt>Sales channel</dt><dd>{label(doc.channel)}</dd></>}
           {terms !== undefined && doc.payment_terms !== undefined && <><dt>Terms</dt><dd>{terms || `Net ${doc.payment_terms}`}</dd></>}
           {doc.due_date && <><dt>Due date</dt><dd>{date(doc.due_date)}</dd></>}
@@ -77,35 +95,36 @@ export function DocPaper({ cfg, doc, org }: any) {
           {doc.delivery_method && <><dt>Delivery method</dt><dd>{doc.delivery_method}</dd></>}
           {doc.shipment_preference && <><dt>Shipment preference</dt><dd>{doc.shipment_preference}</dd></>}
           {doc.salesperson && <><dt>Salesperson</dt><dd>{doc.salesperson}</dd></>}
-          {doc.sales_order_number && <><dt>Sales order</dt><dd><Link to={`/sales-orders/${doc.sales_order_id}`}>{doc.sales_order_number}</Link></dd></>}
-          {doc.purchase_order_number && <><dt>Purchase order</dt><dd><Link to={`/purchase-orders/${doc.purchase_order_id}`}>{doc.purchase_order_number}</Link></dd></>}
-          {doc.invoice_number && <><dt>Invoice</dt><dd><Link to={`/invoices/${doc.invoice_id}`}>{doc.invoice_number}</Link></dd></>}
-          {doc.sales_return_number && <><dt>Sales return</dt><dd><Link to={`/sales-returns/${doc.sales_return_id}`}>{doc.sales_return_number}</Link></dd></>}
-          {doc.bill_number && <><dt>Bill</dt><dd><Link to={`/bills/${doc.bill_id}`}>{doc.bill_number}</Link></dd></>}
+          {doc.sales_order_number && <><dt>Sales order</dt><dd><DocLink preview={preview} to={`/sales-orders/${doc.sales_order_id}`}>{doc.sales_order_number}</DocLink></dd></>}
+          {doc.purchase_order_number && <><dt>Purchase order</dt><dd><DocLink preview={preview} to={`/purchase-orders/${doc.purchase_order_id}`}>{doc.purchase_order_number}</DocLink></dd></>}
+          {doc.invoice_number && <><dt>Invoice</dt><dd><DocLink preview={preview} to={`/invoices/${doc.invoice_id}`}>{doc.invoice_number}</DocLink></dd></>}
+          {doc.sales_return_number && <><dt>Sales return</dt><dd><DocLink preview={preview} to={`/sales-returns/${doc.sales_return_id}`}>{doc.sales_return_number}</DocLink></dd></>}
+          {doc.bill_number && <><dt>Bill</dt><dd><DocLink preview={preview} to={`/bills/${doc.bill_id}`}>{doc.bill_number}</DocLink></dd></>}
           {doc.warehouse_name && <><dt>Warehouse</dt><dd>{doc.warehouse_name}</dd></>}
           {cfg.key === 'vendor_credits' && <><dt>Goods returned</dt><dd>{doc.return_stock ? 'Yes' : 'No'}</dd></>}
+          {t.show_custom_fields && <CustomFieldValues entity={cfg.entity} values={doc.custom_fields} pdf />}
         </dl>
       </div>
       <table className="table mt" style={{ marginTop: 24 }}>
         <thead><tr><th>#</th><th>Item & description</th>{showHsn && <th>HSN/SAC</th>}
           {cfg.key === 'sales_orders' && <><th className="num">Packed</th><th className="num">Shipped</th><th className="num">Invoiced</th></>}
           {cfg.key === 'purchase_orders' && <><th className="num">Received</th><th className="num">Billed</th></>}
-          <th className="num">Qty</th><th className="num">Rate</th><th className="num">Discount</th><th className="num">Tax</th><th className="num">Amount</th></tr></thead>
+          <th className="num">Qty</th><th className="num">Rate</th>{showDisc && <th className="num">Discount</th>}{t.show_tax_column && <th className="num">Tax</th>}<th className="num">Amount</th></tr></thead>
         <tbody>
           {doc.lines.map((l, i) => (
             <tr key={l.id}>
               <td>{i + 1}</td>
-              <td>{l.item_id ? <Link to={`/items/${l.item_id}`}>{l.item_name}</Link> : null}{l.item_sku && <span className="small faint"> · {l.item_sku}</span>}
+              <td>{l.item_id ? <DocLink preview={preview} to={`/items/${l.item_id}`}>{l.item_name}</DocLink> : null}{t.show_sku && l.item_sku && <span className="small faint"> · {l.item_sku}</span>}
                 {l.description && <div className="small muted" style={{ whiteSpace: 'pre-wrap' }}>{l.description}</div>}
                 {l.account && <div className="small faint">{l.account}</div>}
                 {(l.units?.length > 0 || l.tracking) && <div className="small mono faint">{(l.units?.length ? l.units : (l.tracking?.serials || l.tracking?.batches?.map((b) => `${b.batch_no} × ${b.quantity}`) || [])).join(', ')}</div>}</td>
               {showHsn && <td className="small">{l.hsn_sac}</td>}
               {cfg.key === 'sales_orders' && <><td className="num">{qty(l.qty_packed)}</td><td className="num">{qty(l.qty_shipped)}</td><td className="num">{qty(l.qty_invoiced)}</td></>}
               {cfg.key === 'purchase_orders' && <><td className="num">{qty(l.qty_received)}</td><td className="num">{qty(l.qty_billed)}</td></>}
-              <td className="num">{qty(l.quantity)} {l.item_unit || ''}</td>
+              <td className="num">{qty(l.quantity)} {t.show_unit ? l.item_unit || '' : ''}</td>
               <td className="num">{money(l.rate, { symbol: false })}</td>
-              <td className="num">{Number(l.discount_percent) ? `${Number(l.discount_percent)}%` : '—'}</td>
-              <td className="num">{Number(l.tax_rate) ? `${Number(l.tax_rate)}%` : '—'}</td>
+              {showDisc && <td className="num">{Number(l.discount_percent) ? `${Number(l.discount_percent)}%` : '—'}</td>}
+              {t.show_tax_column && <td className="num">{Number(l.tax_rate) ? `${Number(l.tax_rate)}%` : '—'}</td>}
               <td className="num">{money(l.amount, { symbol: false })}</td>
             </tr>
           ))}
@@ -114,7 +133,8 @@ export function DocPaper({ cfg, doc, org }: any) {
       <div className="row mt" style={{ alignItems: 'flex-start' }}>
         <div style={{ flex: 1 }}>
           {doc.notes && <><div className="small muted">Notes</div><div style={{ whiteSpace: 'pre-wrap' }} className="mb">{doc.notes}</div></>}
-          {doc.terms && <><div className="small muted">Terms & conditions</div><div style={{ whiteSpace: 'pre-wrap' }}>{doc.terms}</div></>}
+          {doc.terms && <><div className="small muted">Terms & conditions</div><div style={{ whiteSpace: 'pre-wrap' }} className="mb">{doc.terms}</div></>}
+          {t.bank_details && <><div className="small muted">Bank details</div><div style={{ whiteSpace: 'pre-wrap' }}>{t.bank_details}</div></>}
         </div>
         <div className="totals" style={{ background: 'none' }}>
           <div className="t-row"><span>Sub total</span><span>{money(doc.sub_total)}</span></div>
@@ -128,6 +148,14 @@ export function DocPaper({ cfg, doc, org }: any) {
           {cfg.hasBalance && doc.status !== 'draft' && <div className="t-row bold"><span>Balance due</span><span>{money(doc.balance)}</span></div>}
         </div>
       </div>
+      {t.show_signature && (
+        <div className="doc-sign">
+          {org?.signature_path ? <img src={mediaUrl(org.signature_path)} alt="" /> : <div style={{ height: 48 }} />}
+          <div className="doc-sign-line">{t.signature_label || 'Authorised Signatory'}</div>
+          <div className="small faint">For {org?.legal_name || org?.name}</div>
+        </div>
+      )}
+      {t.footer_note && <div className="doc-footer small muted" style={{ whiteSpace: 'pre-wrap' }}>{t.footer_note}</div>}
     </div>
   );
 }

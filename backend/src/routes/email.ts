@@ -9,6 +9,8 @@ import { encrypt, mask } from '../lib/secrets.js';
 import { appUrl, emailLayout, esc, logEmail, sendMail, smtpSettings } from '../lib/mailer.js';
 import { taxBreakdown } from '../lib/gst.js';
 import { hasPermission } from '../lib/permissions.js';
+import { DEFAULT_TEMPLATE, documentTemplate } from '../lib/templates.js';
+import { fieldDefs } from '../lib/customFields.js';
 
 const r = Router();
 
@@ -26,14 +28,32 @@ export const EMAILABLE = {
 const inr = (n, cur = 'INR') => new Intl.NumberFormat('en-IN', { style: 'currency', currency: cur }).format(Number(n) || 0);
 const fmtDate = (d) => (d ? String(d).slice(0, 10).split('-').reverse().join('/') : '');
 
+/** Template settings and custom field definitions used when rendering a document. */
+export async function documentExtras(db, orgId, entityType) {
+  const [template, fields] = await Promise.all([documentTemplate(db, orgId, entityType), fieldDefs(db, orgId, entityType)]);
+  return { template, fields };
+}
+
+function cfText(d, v) {
+  if (v === undefined || v === null || v === '') return '';
+  if (d.field_type === 'checkbox') return v ? 'Yes' : 'No';
+  if (d.field_type === 'date') return fmtDate(v);
+  return String(v);
+}
+
 /** HTML for a priced document (used in emails and the customer portal). */
-export function documentHtml(cfg, doc, org) {
+export function documentHtml(cfg, doc, org, extras: any = {}) {
+  const t = { ...DEFAULT_TEMPLATE, ...(extras.template || {}) };
+  const accent = t.accent_color || org.brand_color || '#408dfb';
+  const cfs = t.show_custom_fields
+    ? (extras.fields || []).filter((d) => d.show_in_pdf).map((d) => [d.label, cfText(d, doc.custom_fields?.[d.field_key])]).filter(([, v]) => v)
+    : [];
   const cur = org.currency || 'INR';
   const gst = taxBreakdown(doc, org.state);
   const rows = doc.lines.map((l, i) => `<tr>
       <td style="padding:8px;border-bottom:1px solid #eee">${i + 1}</td>
-      <td style="padding:8px;border-bottom:1px solid #eee">${esc(l.item_name || '')}${l.description ? `<div style="color:#5a6276;font-size:12px">${esc(l.description)}</div>` : ''}</td>
-      <td style="padding:8px;border-bottom:1px solid #eee;text-align:right">${Number(l.quantity)} ${esc(l.item_unit || '')}</td>
+      <td style="padding:8px;border-bottom:1px solid #eee">${esc(l.item_name || '')}${t.show_sku && l.item_sku ? `<span style="color:#8a90a0"> · ${esc(l.item_sku)}</span>` : ''}${l.description ? `<div style="color:#5a6276;font-size:12px">${esc(l.description)}</div>` : ''}</td>
+      <td style="padding:8px;border-bottom:1px solid #eee;text-align:right">${Number(l.quantity)} ${t.show_unit ? esc(l.item_unit || '') : ''}</td>
       <td style="padding:8px;border-bottom:1px solid #eee;text-align:right">${inr(l.rate, cur)}</td>
       <td style="padding:8px;border-bottom:1px solid #eee;text-align:right">${inr(l.amount, cur)}</td></tr>`).join('');
   const taxRows = gst.rows.flatMap((t) => (gst.inter
@@ -42,11 +62,12 @@ export function documentHtml(cfg, doc, org) {
   const line = (k: any, v?: any, bold?: any) => `<tr><td style="padding:4px 8px;text-align:right;${bold ? 'font-weight:700' : ''}">${esc(k)}</td><td style="padding:4px 8px;text-align:right;${bold ? 'font-weight:700' : ''}">${v}</td></tr>`;
   return `
   <table role="presentation" width="100%" style="font-size:13px;margin-bottom:12px"><tr>
-    <td><strong>${esc(cfg.label)} #${esc(doc.number)}</strong><br>Date: ${fmtDate(doc.doc_date)}${doc.due_date ? `<br>Due: ${fmtDate(doc.due_date)}` : ''}${doc.expiry_date ? `<br>Valid until: ${fmtDate(doc.expiry_date)}` : ''}${doc.reference ? `<br>Ref: ${esc(doc.reference)}` : ''}</td>
+    <td><strong style="color:${accent}">${esc(t.title || cfg.label)} #${esc(doc.number)}</strong><br>Date: ${fmtDate(doc.doc_date)}${doc.due_date ? `<br>Due: ${fmtDate(doc.due_date)}` : ''}${doc.expiry_date ? `<br>Valid until: ${fmtDate(doc.expiry_date)}` : ''}${doc.reference ? `<br>Ref: ${esc(doc.reference)}` : ''}${cfs.map(([k, v]) => `<br>${esc(k)}: ${esc(v)}`).join('')}</td>
     <td style="text-align:right">${esc(doc.contact_name)}${doc.contact_gstin ? `<br>GSTIN ${esc(doc.contact_gstin)}` : ''}${doc.place_of_supply ? `<br>Place of supply: ${esc(doc.place_of_supply)}` : ''}</td>
   </tr></table>
+  ${t.header_note ? `<p style="white-space:pre-line;border-left:3px solid ${accent};padding:6px 10px;background:#f7f8fa">${esc(t.header_note)}</p>` : ''}
   <table role="presentation" width="100%" cellspacing="0" style="font-size:13px;border-collapse:collapse">
-    <tr style="background:#f4f5f8"><th style="padding:8px;text-align:left">#</th><th style="padding:8px;text-align:left">Item</th><th style="padding:8px;text-align:right">Qty</th><th style="padding:8px;text-align:right">Rate</th><th style="padding:8px;text-align:right">Amount</th></tr>
+    <tr style="background:#f4f5f8;border-bottom:2px solid ${accent}"><th style="padding:8px;text-align:left">#</th><th style="padding:8px;text-align:left">Item</th><th style="padding:8px;text-align:right">Qty</th><th style="padding:8px;text-align:right">Rate</th><th style="padding:8px;text-align:right">Amount</th></tr>
     ${rows}
   </table>
   <table role="presentation" style="margin-left:auto;font-size:13px;margin-top:10px">
@@ -59,7 +80,9 @@ export function documentHtml(cfg, doc, org) {
     ${doc.balance !== undefined && doc.status !== 'draft' && cfg.table === 'invoices' ? line('Balance due', inr(doc.balance, cur), true) : ''}
   </table>
   ${doc.notes ? `<p style="margin-top:16px;white-space:pre-line">${esc(doc.notes)}</p>` : ''}
-  ${doc.terms ? `<p style="color:#5a6276;font-size:12px;white-space:pre-line">${esc(doc.terms)}</p>` : ''}`;
+  ${doc.terms ? `<p style="color:#5a6276;font-size:12px;white-space:pre-line">${esc(doc.terms)}</p>` : ''}
+  ${t.bank_details ? `<p style="font-size:12px;white-space:pre-line"><strong>Bank details</strong><br>${esc(t.bank_details)}</p>` : ''}
+  ${t.footer_note ? `<p style="color:#8a90a0;font-size:12px;text-align:center;white-space:pre-line;border-top:1px solid #eee;padding-top:8px">${esc(t.footer_note)}</p>` : ''}`;
 }
 
 // ------------------------------------------------------------------ SMTP settings
@@ -112,7 +135,8 @@ async function buildDocEmail(req, entityType, entityId) {
   const button = doc.payment_link_url && ['sent', 'partially_paid'].includes(doc.status)
     ? { label: `Pay ${inr(doc.balance, org.currency)} online`, url: doc.payment_link_url }
     : portal ? { label: 'View in customer portal', url: portal } : null;
-  return { cfg, doc, org, contact, button };
+  const extras = await documentExtras({ query }, req.orgId, entityType);
+  return { cfg, doc, org, contact, button, extras };
 }
 
 r.get('/compose/:entityType/:id', async (req, res) => {
@@ -131,13 +155,13 @@ r.post('/send', async (req, res) => {
   const b = req.body || {};
   const entityType = str(b.entity_type, { field: 'Document type', required: true });
   const entityId = Number(b.entity_id);
-  const { cfg, doc, org, button } = await buildDocEmail(req, entityType, entityId);
+  const { cfg, doc, org, button, extras } = await buildDocEmail(req, entityType, entityId);
   const to = String(b.to || '').split(/[,;\s]+/).filter(Boolean).map((e) => emailV(e, { field: 'To' }));
   if (!to.length) throw badRequest('Enter at least one recipient');
   const cc = String(b.cc || '').split(/[,;\s]+/).filter(Boolean).map((e) => emailV(e, { field: 'Cc' }));
   const subject = str(b.subject, { field: 'Subject', required: true, max: 200 });
   const message = str(b.message, { field: 'Message', max: 5000 }) || '';
-  const html = emailLayout({ orgName: org.name, intro: message, button, bodyHtml: documentHtml(cfg, doc, org) });
+  const html = emailLayout({ orgName: org.name, intro: message, button, bodyHtml: documentHtml(cfg, doc, org, extras) });
   try {
     await sendMail(req.orgId, { to, cc, subject, html, replyTo: org.email || undefined });
     await logEmail(req.orgId, { entityType, entityId, to, subject, status: 'sent', userId: req.user.id });

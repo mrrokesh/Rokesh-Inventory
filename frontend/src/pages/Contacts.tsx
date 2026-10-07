@@ -7,6 +7,7 @@ import DataTable from '../components/DataTable';
 import { Attachments, History } from '../components/Attachments';
 import { BackLink, Badge, ErrorBox, Field, FormRow, Input, PageHead, Select, Spinner, Tabs, Textarea, confirmDialog, useAction, useApi } from '../components/ui';
 import { useToast } from '../components/Toast';
+import { CustomFieldInputs, CustomFieldValues } from '../components/CustomFields';
 
 const cfgOf = (type) => (type === 'customer'
   ? { type, path: '/customers', api: '/customers', title: 'Customers', one: 'Customer', perm: 'customers' }
@@ -94,7 +95,7 @@ export function ContactForm({ type }: any) {
   const [f, setF] = useState({
     customer_type: 'business', salutation: '', first_name: '', last_name: '', company_name: '', display_name: '', email: '', phone: '', mobile: '',
     website: '', pan: '', gst_treatment: '', gstin: '', place_of_supply: 'Tamil Nadu', currency: 'INR', payment_terms: 0, credit_limit: '', price_list_id: '',
-    billing_address: { ...EMPTY_ADDR }, shipping_address: { ...EMPTY_ADDR }, notes: '', status: 'active', contact_persons: [],
+    billing_address: { ...EMPTY_ADDR }, shipping_address: { ...EMPTY_ADDR }, notes: '', status: 'active', contact_persons: [], custom_fields: {},
   });
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -177,6 +178,7 @@ export function ContactForm({ type }: any) {
                 <FormRow label="Price list"><Select value={f.price_list_id || ''} onChange={set('price_list_id')} options={pls.map((p) => [p.id, p.name])} placeholder="None" /></FormRow>
                 <FormRow label="Website"><Input value={f.website} onChange={set('website')} /></FormRow>
                 {editing && <FormRow label="Status"><Select value={f.status} onChange={set('status')} options={[['active', 'Active'], ['inactive', 'Inactive']]} /></FormRow>}
+                <CustomFieldInputs entity={type} value={f.custom_fields} onChange={set('custom_fields')} isNew={!editing} />
               </div>
             )}
             {tab === 'address' && (
@@ -347,6 +349,7 @@ export function ContactDetail({ type }: any) {
                 <dt>Payment terms</dt><dd>{PAYMENT_TERMS.find((p) => p[0] === d.payment_terms)?.[1] || `Net ${d.payment_terms}`}</dd>
                 {d.credit_limit && <><dt>Credit limit</dt><dd>{money(d.credit_limit)}</dd></>}
                 {d.price_list_name && <><dt>Price list</dt><dd>{d.price_list_name}</dd></>}
+                <CustomFieldValues entity={type} values={d.custom_fields} />
               </dl>
               {d.notes && <div className="mt small" style={{ whiteSpace: 'pre-wrap' }}>{d.notes}</div>}
             </div></div>

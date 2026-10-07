@@ -8,6 +8,8 @@ import { str, num, int, bool, id, email, obj, oneOf, listParams } from '../lib/v
 import { MODULES, sanitizePermissions } from '../lib/permissions.js';
 import { imageUpload, removePublic } from '../lib/upload.js';
 import { formatNumber } from '../lib/numbering.js';
+import { CUSTOM_FIELD_ENTITIES, CUSTOM_FIELD_TYPES } from '../lib/customFields.js';
+import { DEFAULT_TEMPLATE, TEMPLATE_DOC_TYPES } from '../lib/templates.js';
 import { emailLink } from './email.js';
 import { appUrl } from '../lib/mailer.js';
 import { assertWithinLimit, orgPlan, usageCounts } from '../lib/plans.js';
@@ -56,6 +58,7 @@ r.put('/organization', can('settings', 'edit'), async (req, res) => {
     gstin: gstin ? gstin.toUpperCase() : null,
     pan: str(b.pan, { field: 'PAN', max: 10 }),
     allow_negative_stock: bool(b.allow_negative_stock),
+    brand_color: (() => { const c = str(b.brand_color, { field: 'Brand colour', max: 7 }); if (c && !/^#[0-9a-fA-F]{6}$/.test(c)) throw badRequest('Brand colour must look like #408dfb'); return c; })(),
   };
   const keys = Object.keys(values);
   const { rows } = await query(
@@ -405,6 +408,130 @@ r.get('/audit-logs', can('reports', 'view'), async (req, res) => {
     query(`SELECT COUNT(*)::int AS n FROM audit_logs a WHERE ${w}`, params),
   ]);
   res.json({ data: rows, total: c.n, page: p.page, per_page: p.perPage });
+});
+
+// ------------------------------------------------------------ digital signature (shown on documents)
+r.post('/organization/signature', can('settings', 'edit'), imageUpload.single('file'), async (req, res) => {
+  if (!req.file) throw badRequest('Choose an image of the signature');
+  const { rows: [old] } = await query('SELECT signature_path FROM organizations WHERE id = $1', [req.orgId]);
+  const p = `/uploads/public/${req.file.filename}`;
+  await query('UPDATE organizations SET signature_path = $2 WHERE id = $1', [req.orgId, p]);
+  removePublic(old?.signature_path);
+  await audit({ query }, req, 'update', 'organization', req.orgId, 'Authorised signature uploaded');
+  res.json({ signature_path: p });
+});
+
+r.delete('/organization/signature', can('settings', 'edit'), async (req, res) => {
+  const { rows: [old] } = await query('SELECT signature_path FROM organizations WHERE id = $1', [req.orgId]);
+  await query('UPDATE organizations SET signature_path = NULL WHERE id = $1', [req.orgId]);
+  removePublic(old?.signature_path);
+  res.status(204).end();
+});
+
+// ------------------------------------------------------------ custom fields
+r.get('/custom-fields/meta', (_req, res) => res.json({ entities: CUSTOM_FIELD_ENTITIES, types: CUSTOM_FIELD_TYPES }));
+
+r.get('/custom-fields', async (req, res) => {
+  const params: any[] = [req.orgId];
+  let where = 'org_id = $1';
+  if (req.query.entity) { params.push(String(req.query.entity)); where += ' AND entity = $2'; }
+  if (req.query.active === 'true') where += ' AND is_active';
+  const { rows } = await query(`SELECT * FROM custom_fields WHERE ${where} ORDER BY entity, position, id`, params);
+  res.json(rows);
+});
+
+function parseFieldDef(b) {
+  const field_type = oneOf(b.field_type, CUSTOM_FIELD_TYPES, { field: 'Type', def: 'text' });
+  const options = field_type === 'dropdown'
+    ? [...new Set((Array.isArray(b.options) ? b.options : String(b.options || '').split(/[\n,]+/)).map((o) => String(o).trim()).filter(Boolean))]
+    : [];
+  if (field_type === 'dropdown' && !options.length) throw badRequest('Add at least one choice for the dropdown');
+  const pattern = str(b.pattern, { field: 'Pattern', max: 200 });
+  if (pattern) { try { new RegExp(pattern); } catch { throw badRequest('The validation pattern is not a valid regular expression'); } }
+  return {
+    label: str(b.label, { field: 'Label', required: true, max: 80 }),
+    field_type,
+    options: JSON.stringify(options),
+    required: bool(b.required),
+    default_value: str(b.default_value, { field: 'Default value', max: 500 }),
+    pattern,
+    pattern_message: str(b.pattern_message, { field: 'Pattern message', max: 200 }),
+    help_text: str(b.help_text, { field: 'Help text', max: 300 }),
+    show_in_pdf: bool(b.show_in_pdf, true),
+    show_in_list: bool(b.show_in_list),
+    is_active: bool(b.is_active, true),
+    position: int(b.position, { field: 'Position', def: 0 }),
+  };
+}
+
+r.post('/custom-fields', can('settings', 'edit'), async (req, res) => {
+  const b = req.body || {};
+  const entity = oneOf(b.entity, Object.keys(CUSTOM_FIELD_ENTITIES), { field: 'Record type' });
+  const v = parseFieldDef(b);
+  let key = (str(b.field_key, { field: 'Key', max: 40 }) || v.label).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 40) || 'field';
+  const { rows: taken } = await query('SELECT field_key FROM custom_fields WHERE org_id = $1 AND entity = $2', [req.orgId, entity]);
+  const used = new Set(taken.map((t) => t.field_key));
+  for (let i = 2, base = key; used.has(key); i++) key = `${base}_${i}`;
+  const keys = Object.keys(v);
+  const { rows: [row] } = await query(
+    `INSERT INTO custom_fields (org_id, entity, field_key, ${keys.join(', ')})
+     VALUES ($1, $2, $3, ${keys.map((_, i) => `$${i + 4}`).join(', ')}) RETURNING *`,
+    [req.orgId, entity, key, ...keys.map((k) => v[k])],
+  );
+  await audit({ query }, req, 'create', 'custom_field', row.id, `Custom field "${row.label}" added to ${CUSTOM_FIELD_ENTITIES[entity]}`);
+  res.status(201).json(row);
+});
+
+r.put('/custom-fields/:id', can('settings', 'edit'), async (req, res) => {
+  const v = parseFieldDef(req.body || {});
+  const keys = Object.keys(v);
+  const { rows: [row] } = await query(
+    `UPDATE custom_fields SET ${keys.map((k, i) => `${k} = $${i + 3}`).join(', ')} WHERE org_id = $1 AND id = $2 RETURNING *`,
+    [req.orgId, Number(req.params.id), ...keys.map((k) => v[k])],
+  );
+  if (!row) throw notFound('Custom field');
+  await audit({ query }, req, 'update', 'custom_field', row.id, `Custom field "${row.label}" updated`);
+  res.json(row);
+});
+
+r.delete('/custom-fields/:id', can('settings', 'edit'), async (req, res) => {
+  // Values already saved on records are kept (they simply stop being shown).
+  const { rows: [row] } = await query('DELETE FROM custom_fields WHERE org_id = $1 AND id = $2 RETURNING label', [req.orgId, Number(req.params.id)]);
+  if (!row) throw notFound('Custom field');
+  await audit({ query }, req, 'delete', 'custom_field', Number(req.params.id), `Custom field "${row.label}" deleted`);
+  res.status(204).end();
+});
+
+// ------------------------------------------------------------ document (PDF) templates
+function parseTemplate(b) {
+  const t: any = { ...DEFAULT_TEMPLATE };
+  for (const [k, def] of Object.entries(DEFAULT_TEMPLATE)) {
+    if (b[k] === undefined) continue;
+    if (typeof def === 'boolean') t[k] = bool(b[k]);
+    else t[k] = str(b[k], { field: k, max: k === 'bank_details' || k.startsWith('default_') || k.endsWith('_note') ? 3000 : 120 }) || '';
+  }
+  t.layout = oneOf(t.layout, ['standard', 'compact', 'modern'], { field: 'Layout', def: 'standard' });
+  t.font_size = oneOf(t.font_size, ['small', 'normal', 'large'], { field: 'Font size', def: 'normal' });
+  if (t.accent_color && !/^#[0-9a-fA-F]{6}$/.test(t.accent_color)) throw badRequest('Accent colour must look like #408dfb');
+  return t;
+}
+
+r.get('/templates', async (req, res) => {
+  const { rows } = await query('SELECT doc_type, settings FROM document_templates WHERE org_id = $1', [req.orgId]);
+  const saved = Object.fromEntries(rows.map((x) => [x.doc_type, x.settings]));
+  res.json(Object.fromEntries(TEMPLATE_DOC_TYPES.map((d) => [d, { ...DEFAULT_TEMPLATE, ...(saved[d] || {}) }])));
+});
+
+r.put('/templates/:docType', can('settings', 'edit'), async (req, res) => {
+  const docType = oneOf(req.params.docType, TEMPLATE_DOC_TYPES, { field: 'Document type' });
+  const t = parseTemplate(req.body || {});
+  await query(
+    `INSERT INTO document_templates (org_id, doc_type, settings) VALUES ($1, $2, $3)
+     ON CONFLICT (org_id, doc_type) DO UPDATE SET settings = EXCLUDED.settings, updated_at = now()`,
+    [req.orgId, docType, JSON.stringify(t)],
+  );
+  await audit({ query }, req, 'update', 'document_template', null, `Template for ${docType.replace('_', ' ')} updated`);
+  res.json(t);
 });
 
 export default r;
