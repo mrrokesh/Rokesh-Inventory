@@ -5,6 +5,7 @@ import { badRequest } from '../lib/errors.js';
 import { round2 } from '../lib/validate.js';
 import { periodRange } from './dashboard.js';
 import { EXTRA_REPORTS } from './reportsExtra.js';
+import { realizedGain } from '../lib/fx.js';
 import { reportExtrasRouter } from './reportSchedules.js';
 
 const r = Router();
@@ -512,7 +513,8 @@ const REPORTS: any = {
       const shipping = await one(`SELECT COALESCE(SUM(shipping_cost),0) AS v FROM shipments WHERE org_id = $1 AND ship_date BETWEEN $2 AND $3`);
       const netSales = sales - returns;
       const gross = netSales - cogs;
-      const net = gross - adjustments - expenses - shipping;
+      const fx = await realizedGain(org, from, to);
+      const net = gross - adjustments - expenses - shipping + fx;
       const rows = [
         { account: 'Sales', amount: round2(sales) },
         { account: 'Less: Sales returns / credit notes', amount: round2(-returns) },
@@ -522,6 +524,7 @@ const REPORTS: any = {
         { account: 'Inventory adjustments (loss) / gain', amount: round2(-adjustments) },
         { account: 'Non-inventory purchases & services (bills)', amount: round2(-expenses) },
         { account: 'Shipping costs', amount: round2(-shipping) },
+        ...(fx ? [{ account: 'Exchange gain / (loss)', amount: round2(fx) }] : []),
         { account: 'Net profit', amount: round2(net), bold: true },
       ];
       return { columns: [col('account', 'Account'), col('amount', 'Amount', 'money')], rows };

@@ -248,6 +248,7 @@ export function PaymentDetail({ kind }: any) {
           </tbody>
         </table>
         {p.unused_amount > 0 && <div className="mt right">Amount in excess (unused credit): <strong>{pm(p.unused_amount)}</strong></div>}
+        {Number(p.fx_gain) !== 0 && <div className="mt right small">Exchange {Number(p.fx_gain) > 0 ? 'gain' : 'loss'} on this payment (the rate differs from the {c.kind === 'received' ? 'invoices' : 'bills'}): <strong style={{ color: Number(p.fx_gain) > 0 ? 'var(--green)' : 'var(--danger, #d33)' }}>{money(Math.abs(p.fx_gain))}</strong></div>}
         {p.notes && <div className="mt small muted" style={{ whiteSpace: 'pre-wrap' }}>{p.notes}</div>}
       </div>
       <div className="stack">

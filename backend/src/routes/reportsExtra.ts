@@ -3,6 +3,7 @@
 // A column may carry `link: '/invoices/{id}'` — the page turns the cell into a link using row fields.
 import { query } from '../db.js';
 import { round2 } from '../lib/validate.js';
+import { REALIZED_SQL, UNREALIZED_SQL } from '../lib/fx.js';
 
 const col = (key, label, type = 'text', link = undefined) => ({ key, label, type, ...(link ? { link } : {}) });
 const sumCols = (rows, keys) => Object.fromEntries(keys.map((k) => [k, round2(rows.reduce((s, x) => s + (Number(x[k]) || 0), 0))]));
@@ -558,6 +559,25 @@ export const EXTRA_REPORTS: any = {
         [org, from, to],
       );
       return { columns: [col('created_at', 'When', 'datetime'), col('provider', 'App', 'label'), col('action', 'Action', 'label'), col('status', 'Result', 'status'), col('message', 'Details')], rows };
+    },
+  },
+  exchange_gain_loss: {
+    group: 'Taxes & Accounting', title: 'Exchange Gain or Loss', dated: true, warehouse: false,
+    description: 'Foreign-currency invoices and bills settled at a different exchange rate than they were made at. Positive = you gained in your base currency. “Unrealized” rows show what open balances would gain or lose at today’s rate.',
+    run: async ({ org, from, to }) => {
+      const { rows: realized } = await query(`SELECT * FROM (${REALIZED_SQL}) x ORDER BY date DESC`, [org, from, to]);
+      const { rows: unrealized } = await query(`SELECT * FROM (${UNREALIZED_SQL}) x ORDER BY gain`, [org]);
+      const rows = [
+        ...realized.map((r) => ({ ...r, status: 'Realized' })),
+        ...unrealized.map((r) => ({ ...r, date: null, ref: 'Open balance', status: 'Unrealized (today’s rate)' })),
+      ];
+      const real = round2(realized.reduce((s, r) => s + Number(r.gain), 0));
+      return {
+        columns: [col('date', 'Date', 'date'), col('status', 'Type'), col('kind', 'Settled by'), col('ref', 'Payment / credit'), col('doc', 'Invoice / bill'),
+          col('contact', 'Customer / vendor'), col('currency', 'Currency'), col('amount', 'Amount (foreign)', 'number'), col('doc_rate', 'Booked at', 'number'),
+          col('settle_rate', 'Settled / today', 'number'), col('gain', 'Gain / (loss)', 'money')],
+        rows, totals: { gain: real },
+      };
     },
   },
   sms_sent: {

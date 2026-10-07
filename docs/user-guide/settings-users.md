@@ -38,6 +38,11 @@ What happens behind the scenes:
 
 Update the rates in **Settings → Currencies** whenever you like. Old documents keep the rate they were made with.
 
+**Exchange gain or loss.** If a $100 invoice was made at ₹83 and the customer pays when the dollar is ₹85, you receive ₹200 more than the invoice was worth. That's an exchange gain. The opposite is a loss. Bills work the other way round: paying a euro bill when the euro is cheaper is a gain. You can see it:
+- on the payment page (*Exchange gain on this payment*),
+- in **Reports → Exchange Gain or Loss**, which lists every settlement and also shows what open invoices and bills would gain or lose at today's rate (*unrealized*),
+- as its own line in the **Profit and Loss Summary**.
+
 ## Taxes
 
 Add every tax rate you charge, e.g. GST5, GST12, GST18, GST28. Then pick the right tax on each item; orders and invoices calculate tax automatically.

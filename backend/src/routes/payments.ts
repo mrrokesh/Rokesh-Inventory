@@ -52,11 +52,16 @@ export function paymentsRouter(kind) {
     );
     if (!rows[0]) throw notFound(cfg.label);
     const { rows: allocations } = await db.query(
-      `SELECT a.id, a.${cfg.docCol} AS doc_id, a.amount, x.number AS doc_number, x.doc_date, x.due_date, x.total AS doc_total, x.balance AS doc_balance
+      `SELECT a.id, a.${cfg.docCol} AS doc_id, a.amount, x.number AS doc_number, x.doc_date, x.due_date, x.total AS doc_total, x.balance AS doc_balance, x.exchange_rate AS doc_rate
          FROM ${cfg.alloc} a JOIN ${cfg.docTable} x ON x.id = a.${cfg.docCol} WHERE a.payment_id = $1 ORDER BY x.doc_date`,
       [pid],
     );
-    return { ...rows[0], allocations };
+    // Exchange gain/loss when a foreign-currency payment settles documents booked at another rate.
+    const rate = Number(rows[0].exchange_rate) || 1;
+    for (const a of allocations) {
+      a.fx_gain = Math.round(Number(a.amount) * (received ? rate - Number(a.doc_rate) : Number(a.doc_rate) - rate) * 100) / 100;
+    }
+    return { ...rows[0], allocations, fx_gain: Math.round(allocations.reduce((s, a) => s + a.fx_gain, 0) * 100) / 100 };
   }
 
   r.get('/:id', can(M, 'view'), async (req, res) => {
