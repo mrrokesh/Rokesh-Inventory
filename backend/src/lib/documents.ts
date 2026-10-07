@@ -131,10 +131,9 @@ export async function refreshPayable(client, kind, docId) {
   const creditSql = isInvoice
     ? 'SELECT COALESCE(SUM(amount),0) AS s FROM credit_applications WHERE invoice_id = $1'
     : 'SELECT COALESCE(SUM(amount),0) AS s FROM vendor_credit_applications WHERE bill_id = $1';
-  const [{ rows: [p] }, { rows: [c] }, { rows: [d] }] = await Promise.all([
-    client.query(paidSql, [docId]), client.query(creditSql, [docId]),
-    client.query(`SELECT total, status FROM ${table} WHERE id = $1`, [docId]),
-  ]);
+  const { rows: [p] } = await client.query(paidSql, [docId]);
+  const { rows: [c] } = await client.query(creditSql, [docId]);
+  const { rows: [d] } = await client.query(`SELECT total, status FROM ${table} WHERE id = $1`, [docId]);
   if (d.status === 'draft' || d.status === 'void') return;
   const paid = Number(p.s);
   const credited = Number(c.s);
@@ -155,9 +154,8 @@ export async function refreshCredit(client, kind, creditId) {
     ? `SELECT (SELECT COALESCE(SUM(amount),0) FROM credit_applications WHERE credit_note_id = $1)
             + (SELECT COALESCE(SUM(amount),0) FROM credit_refunds WHERE credit_note_id = $1) AS s`
     : 'SELECT COALESCE(SUM(amount),0) AS s FROM vendor_credit_applications WHERE vendor_credit_id = $1';
-  const [{ rows: [a] }, { rows: [d] }] = await Promise.all([
-    client.query(appliedSql, [creditId]), client.query(`SELECT total, status FROM ${table} WHERE id = $1`, [creditId]),
-  ]);
+  const { rows: [a] } = await client.query(appliedSql, [creditId]);
+  const { rows: [d] } = await client.query(`SELECT total, status FROM ${table} WHERE id = $1`, [creditId]);
   if (d.status === 'draft' || d.status === 'void') return;
   const balance = round2(Number(d.total) - Number(a.s));
   if (balance < -0.004) throw badRequest('Amount exceeds the available credit');

@@ -28,6 +28,8 @@ import { estimates, deliveryChallans } from './routes/salesDocs.js';
 import emailRoutes from './routes/email.js';
 import integrationRoutes from './routes/integrations.js';
 import commentRoutes from './routes/comments.js';
+import workflowRoutes from './routes/workflows.js';
+import { startWorkflowWorkers } from './lib/workflows.js';
 import portalRoutes, { portalAdmin } from './routes/portal.js';
 import platformRoutes from './routes/platform.js';
 import { handleRazorpayWebhook, startIntegrationScheduler } from './lib/integrations.js';
@@ -107,6 +109,7 @@ api.use('/reports', reportRoutes);
 api.use('/email', emailRoutes);
 api.use('/integrations', integrationRoutes);
 api.use('/comments', commentRoutes);
+api.use('/workflows', workflowRoutes);
 app.use('/api', api);
 app.use('/api', (_req, _res, next) => next(notFound('API endpoint')));
 
@@ -124,6 +127,7 @@ migrate()
   .then(() => {
     app.listen(config.port, () => console.log(`Inventory API listening on http://localhost:${config.port}`));
     startWebhookWorker();
+    startWorkflowWorkers();
     startIntegrationScheduler();
   })
   .catch((err) => {

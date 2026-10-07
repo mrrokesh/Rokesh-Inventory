@@ -1,4 +1,5 @@
 import { enqueueEvent } from './webhooks.js';
+import { enqueueWorkflow } from './workflows.js';
 
 /**
  * Record an audit log entry and queue a webhook event `<entity>.<action>`.
@@ -11,4 +12,5 @@ export async function audit(db: any, req: any, action: any, entityType?: any, en
     [req.orgId, req.user?.id ?? null, action, entityType, entityId ?? null, summary ?? null],
   );
   await enqueueEvent(db, req.orgId, `${entityType}.${action}`, { entity_type: entityType, entity_id: entityId ?? null, action, summary: summary ?? null });
+  await enqueueWorkflow(db, req.orgId, entityType, action, entityId, req.user?.id);
 }

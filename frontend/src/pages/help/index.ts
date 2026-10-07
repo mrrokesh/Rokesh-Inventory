@@ -22,6 +22,7 @@ export const ARTICLES = [
   { slug: 'documents', group: 'Stock & reports', description: 'Attach files and print or save PDFs.', routes: ['/documents'] },
   { slug: 'settings-users', group: 'Admin', description: 'Company details, taxes, warehouses, users and roles.', routes: ['/settings', '/profile'] },
   { slug: 'customization', group: 'Admin', description: 'Custom fields, PDF templates, brand colour and signature.', routes: ['/settings/custom-fields', '/settings/templates', '/settings/branding'] },
+  { slug: 'workflows', group: 'Admin', description: 'Automatic emails, tasks, webhooks and field updates.', routes: ['/settings/workflows'] },
   { slug: 'customer-portal', group: 'Admin', description: 'Let customers see their invoices, orders and shipments online.', routes: [] },
   { slug: 'email-integrations', group: 'Admin', description: 'Email documents, online payments, Shiprocket, Shopify and APIs.', routes: ['/settings/email', '/settings/integrations', '/settings/developer'] },
   { slug: 'faq', group: 'Admin', description: 'Answers to common problems and error messages.', routes: [] },

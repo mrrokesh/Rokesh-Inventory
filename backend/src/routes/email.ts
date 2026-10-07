@@ -30,7 +30,8 @@ const fmtDate = (d) => (d ? String(d).slice(0, 10).split('-').reverse().join('/'
 
 /** Template settings and custom field definitions used when rendering a document. */
 export async function documentExtras(db, orgId, entityType) {
-  const [template, fields] = await Promise.all([documentTemplate(db, orgId, entityType), fieldDefs(db, orgId, entityType)]);
+  const template = await documentTemplate(db, orgId, entityType);
+  const fields = await fieldDefs(db, orgId, entityType);
   return { template, fields };
 }
 

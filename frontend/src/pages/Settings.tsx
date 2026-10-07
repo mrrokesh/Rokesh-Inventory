@@ -9,6 +9,7 @@ import { Badge, Checkbox, ErrorBox, Field, FormRow, Input, Modal, PageHead, Sele
 import { useToast } from '../components/Toast';
 import { Developer, EmailSettings, Integrations } from './SettingsExtra';
 import { BrandingSettings, CustomFieldsSettings, TemplatesSettings } from './SettingsCustom';
+import WorkflowSettings from './Workflows';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -432,7 +433,7 @@ function AuditLog() {
 
 // ------------------------------------------------------------------ shell
 const LINKS = [
-  ['organization', 'Organization profile'], ['branding', 'Branding'], ['warehouses', 'Warehouses'], ['taxes', 'Taxes'], ['units', 'Units'], ['numbering', 'Number series'], ['custom-fields', 'Custom fields'], ['templates', 'PDF templates'],
+  ['organization', 'Organization profile'], ['branding', 'Branding'], ['warehouses', 'Warehouses'], ['taxes', 'Taxes'], ['units', 'Units'], ['numbering', 'Number series'], ['custom-fields', 'Custom fields'], ['templates', 'PDF templates'], ['workflows', 'Workflow rules'],
   ['carriers', 'Shipping carriers'], ['email', 'Email'], ['announcements', 'Announcements'], ['integrations', 'Integrations'],
   ['developer', 'API keys & webhooks', 'users'], ['users', 'Users', 'users'], ['roles', 'Roles & permissions', 'users'], ['audit', 'Audit log', 'reports'],
 ];
@@ -523,6 +524,7 @@ export default function Settings() {
             <Route path="branding" element={<BrandingSettings />} />
             <Route path="custom-fields" element={<CustomFieldsSettings />} />
             <Route path="templates" element={<TemplatesSettings />} />
+            <Route path="workflows" element={<WorkflowSettings />} />
             <Route path="warehouses" element={<Warehouses />} />
             <Route path="taxes" element={<Taxes />} />
             <Route path="units" element={<Units />} />

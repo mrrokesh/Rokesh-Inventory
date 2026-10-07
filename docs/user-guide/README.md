@@ -21,6 +21,7 @@ The same guides appear inside the app under **Help & Guides** (and the **?** but
 - [Managing stock](stock.md)
 - [Serial numbers and batches](serial-batch.md)
 - [Custom fields, PDF templates and branding](customization.md)
+- [Workflow rules](workflows.md)
 - [GST: invoices and returns](gst.md)
 - [Reports](reports.md)
 - [Documents, attachments and printing](documents.md)

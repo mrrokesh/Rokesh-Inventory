@@ -76,7 +76,8 @@ export async function stockOut(client, ctx, m) {
   if (qty <= 0) return { value: 0, unitCost: 0 };
   const level = await lockLevel(client, ctx.orgId, m.itemId, m.warehouseId);
   if (Number(level.on_hand) + EPS < qty && !(await allowNegative(client, ctx.orgId))) {
-    const [label, wh] = await Promise.all([itemLabel(client, m.itemId), warehouseName(client, m.warehouseId)]);
+    const label = await itemLabel(client, m.itemId);
+    const wh = await warehouseName(client, m.warehouseId);
     throw conflict(`Not enough stock for ${label} in ${wh}: ${Number(level.on_hand)} on hand, ${qty} needed.`);
   }
   const tracking = await applyTracking(client, ctx, m, -1, qty);
