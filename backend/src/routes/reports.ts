@@ -1,12 +1,14 @@
 import { Router } from 'express';
 import { query } from '../db.js';
 import { can } from '../middleware/auth.js';
-import { badRequest } from '../lib/errors.js';
+import { badRequest, notFound } from '../lib/errors.js';
 import { round2 } from '../lib/validate.js';
 import { periodRange } from './dashboard.js';
 import { EXTRA_REPORTS } from './reportsExtra.js';
 import { realizedGain } from '../lib/fx.js';
 import { reportExtrasRouter } from './reportSchedules.js';
+import { customReportsRouter, listCustomReports, visibleCustomReport } from './customReports.js';
+import { SOURCES, runDefinition } from '../lib/reportBuilder.js';
 
 const r = Router();
 
@@ -669,13 +671,30 @@ Object.assign(REPORTS, {
 
 Object.assign(REPORTS, EXTRA_REPORTS);
 
-r.get('/', can('reports', 'view'), (_req, res) => {
-  res.json(Object.entries(REPORTS).map(([key, x]: any) => ({ key, group: x.group, title: x.title, description: x.description, dated: x.dated, warehouse: x.warehouse, tagged: !!x.tagged })));
+r.get('/', can('reports', 'view'), async (req, res) => {
+  const builtIn = Object.entries(REPORTS).map(([key, x]: any) => ({ key, group: x.group, title: x.title, description: x.description, dated: x.dated, warehouse: x.warehouse, tagged: !!x.tagged }));
+  const custom = (await listCustomReports(req.orgId, req.user)).map((c) => ({
+    key: `custom_${c.id}`, group: 'Custom reports', title: c.name, custom: true, shared: c.shared, created_by_name: c.created_by_name, mine: c.created_by === req.user.id,
+    description: c.description || `${SOURCES[c.source]?.label || c.source}${c.shared ? ' · shared' : ' · only you'}${c.created_by !== req.user.id ? ` · by ${c.created_by_name}` : ''}`,
+    dated: SOURCES[c.source]?.dated !== false, tagged: !!SOURCES[c.source]?.tagAlias,
+  }));
+  res.json([...builtIn, ...custom]);
 });
 
 /** Run a report for an organization (used by the page and by scheduled emails). */
 export async function runReport(orgId, key, opts: any = {}) {
-  const rep = REPORTS[String(key)];
+  let rep = REPORTS[String(key)];
+  const custom = /^custom_(\d+)$/.exec(String(key));
+  if (custom) {
+    // opts.user is set for people opening the report; scheduled emails run for the organization.
+    const def = await visibleCustomReport(orgId, Number(custom[1]), opts.user);
+    if (!def) throw notFound('Report');
+    const src = SOURCES[def.source];
+    rep = {
+      title: def.name, description: def.description || `Custom report on ${src?.label || def.source}`, dated: src?.dated !== false, warehouse: false, tagged: !!src?.tagAlias, custom: true,
+      run: ({ org, from, to, tagSql }) => runDefinition(org, def.source, def.definition, { from, to, tagSql }),
+    };
+  }
   if (!rep) throw badRequest('Unknown report');
   const { rows: [o] } = await query('SELECT fiscal_year_start, state FROM organizations WHERE id = $1', [orgId]);
   let { from, to } = periodRange(opts.period || 'this_year', o.fiscal_year_start);
@@ -695,16 +714,21 @@ export async function runReport(orgId, key, opts: any = {}) {
   }
   const tagSql = (alias) => filters.map((f) => ` AND ${alias}.tags->>'${Number(f.id)}' = '${f.value.replace(/'/g, "''")}'`).join('');
   const result = await rep.run({ org: orgId, from, to, warehouse, state: o.state || '', tagSql });
-  return { key, title: rep.title, description: rep.description, dated: rep.dated, warehouse: rep.warehouse, tagged: !!rep.tagged, tag_filters: filters, from, to, ...result };
+  return { key, title: rep.title, description: rep.description, dated: rep.dated, warehouse: rep.warehouse, tagged: !!rep.tagged, custom: !!rep.custom, tag_filters: filters, from, to, ...result };
 }
 
-export const reportExists = (key) => !!REPORTS[String(key)];
+export async function reportExists(key, orgId) {
+  if (REPORTS[String(key)]) return true;
+  const m = /^custom_(\d+)$/.exec(String(key));
+  return !!(m && (await visibleCustomReport(orgId, Number(m[1]))));
+}
 
 // Favourites and schedules come before /:key so their paths are not taken as report keys.
 r.use(reportExtrasRouter);
+r.use(customReportsRouter);
 
 r.get('/:key', can('reports', 'view'), async (req, res) => {
-  res.json(await runReport(req.orgId, req.params.key, req.query));
+  res.json(await runReport(req.orgId, req.params.key, { ...req.query, user: req.user }));
 });
 
 export default r;

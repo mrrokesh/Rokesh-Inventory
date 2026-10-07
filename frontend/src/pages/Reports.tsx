@@ -52,7 +52,10 @@ export function ReportsIndex() {
   const favs = fav.list.map((k) => byKey[k]).filter(Boolean);
   return (
     <div className="page">
-      <PageHead title="Reports"><input type="search" className="input" style={{ width: 260 }} placeholder="Search reports" value={search} onChange={(e) => setSearch(e.target.value)} /></PageHead>
+      <PageHead title="Reports">
+        <input type="search" className="input" style={{ width: 260 }} placeholder="Search reports" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <Link className="btn primary" to="/reports/custom/new">+ New custom report</Link>
+      </PageHead>
       {!search && (favs.length > 0 || schedules.data?.length > 0) && (
         <div className="grid-2 mb">
           <div className="card">
@@ -207,6 +210,7 @@ export function ReportView() {
     <div className="page">
       <PageHead title={rep?.title || 'Report'} crumb={<Link to="/reports">Reports</Link>}>
         {fav.loaded && <Star on={fav.list.includes(key)} onClick={() => fav.toggle(key)} />}
+        {rep?.custom && <Link className="btn" to={`/reports/custom/${key.replace('custom_', '')}/edit`}>Edit report</Link>}
         {rep && <button type="button" className="btn" onClick={() => setScheduling(true)}><Icon name="clock" size={14} className="" /> Schedule</button>}
         {rep && <button type="button" className="btn" onClick={exportXlsx}><Icon name="download" size={14} className="" /> Export Excel</button>}
         {rep && <button type="button" className="btn" onClick={() => window.print()}><Icon name="print" size={14} className="" /> Print / PDF</button>}

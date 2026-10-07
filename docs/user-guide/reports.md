@@ -52,6 +52,20 @@ In the "Details" and "History" reports, **click a number** (invoice#, order#, it
 
 **Filter by reporting tag.** If you use reporting tags (Settings → Reporting tags), sales and purchase reports show a dropdown for each tag next to the period. Choose a value, for example *Region: North*, and the report only counts documents with that tag. The chosen filter is shown next to the dates.
 
+## Build your own report
+
+When no ready-made report fits, make your own: **Reports → + New custom report**.
+
+1. **Name** the report and choose what it's **about**: invoices, bills, orders, estimates or credit notes (one row per document), their **item lines** (one row per item sold or bought), **items**, **customers**, **vendors**, **stock movements**, or **payments**.
+2. Tick the **columns** you want and use ↑ ↓ to put them in order. Your custom fields and reporting tags are in the list too.
+3. Add **filters**, e.g. *Customer contains "Traders"*, *Total is at least 10000*, *Category is Lighting*.
+4. **Group by** to get one line per group with totals, e.g. item lines grouped by *Category*, or invoices grouped by *Customer*. Tick amount or quantity columns to total them. Then choose how to **sort**.
+5. Press **Run preview** to check it, then **Save report**.
+
+Saved reports appear under **Custom reports** on the Reports page and work like the built-in ones: choose the period, filter by reporting tag, export to Excel, print, star as a favourite, or schedule by email.
+
+**Sharing:** tick *Share with everyone in the team* to let your colleagues open it. Otherwise only you (and administrators) can see it. Only the person who made a report, or an administrator, can change or delete it, using **Edit report** at the top.
+
 ## Favourite reports
 
 Click the **☆ star** next to a report, on the Reports page or at the top of an open report. Favourites are listed at the top of the Reports page, so the ones you use every day are one click away. Each user has their own favourites.

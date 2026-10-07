@@ -57,6 +57,7 @@ const TasksList = lazy(() => import('./pages/WarehouseOps').then((m) => ({ defau
 const TaskDetail = lazy(() => import('./pages/WarehouseOps').then((m) => ({ default: m.TaskDetail })));
 const ReportsIndex = lazy(() => import('./pages/Reports').then((m) => ({ default: m.ReportsIndex })));
 const ReportView = lazy(() => import('./pages/Reports').then((m) => ({ default: m.ReportView })));
+const ReportBuilder = lazy(() => import('./pages/ReportBuilder'));
 const Documents = lazy(() => import('./pages/Documents'));
 const Import = lazy(() => import('./pages/Import'));
 const Settings = lazy(() => import('./pages/Settings'));
@@ -191,6 +192,8 @@ export default function App() {
           <Route path="/payments-made/:id/edit" element={<Guard perm="payments_made" action="edit"><PaymentForm key="pme" kind="made" /></Guard>} />
 
           <Route path="/reports" element={<Guard perm="reports"><ReportsIndex /></Guard>} />
+          <Route path="/reports/custom/new" element={<Guard perm="reports"><ReportBuilder key="new" /></Guard>} />
+          <Route path="/reports/custom/:id/edit" element={<Guard perm="reports"><ReportBuilder /></Guard>} />
           <Route path="/reports/:key" element={<Guard perm="reports"><ReportView /></Guard>} />
           <Route path="/documents" element={<Guard perm="documents"><Documents /></Guard>} />
           <Route path="/import/:type" element={<Import />} />

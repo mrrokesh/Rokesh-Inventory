@@ -19,7 +19,7 @@ r.get('/favourites', can('reports', 'view'), async (req, res) => {
 });
 
 r.put('/favourites/:key', can('reports', 'view'), async (req, res) => {
-  if (!(await reports()).reportExists(req.params.key)) throw notFound('Report');
+  if (!(await (await reports()).reportExists(req.params.key, req.orgId))) throw notFound('Report');
   await query('INSERT INTO report_favourites (user_id, report_key) VALUES ($1, $2) ON CONFLICT DO NOTHING', [req.user.id, req.params.key]);
   res.status(204).end();
 });
@@ -51,7 +51,7 @@ export async function nextRunAt(orgId, s) {
 
 async function parseSchedule(orgId, b) {
   const report_key = String(b.report_key || '');
-  if (!(await reports()).reportExists(report_key)) throw badRequest('Choose a report');
+  if (!(await (await reports()).reportExists(report_key, orgId))) throw badRequest('Choose a report');
   const frequency = FREQ.includes(b.frequency) ? b.frequency : null;
   if (!frequency) throw badRequest('Choose how often to send it');
   const period = PERIODS.includes(b.period) ? b.period : 'this_month';
