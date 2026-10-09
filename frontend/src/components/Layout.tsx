@@ -261,10 +261,20 @@ export default function Layout({ children }: any) {
   const { organization } = useLookups('organization');
   useEffect(() => { applyBrandColor(organization?.brand_color); }, [organization?.brand_color]);
   const initials = (user?.name || '?').split(' ').map((s) => s[0]).slice(0, 2).join('').toUpperCase();
+  const endImpersonation = () => {
+    logout();
+    navigate('/platform');
+  };
   return (
     <div className="app">
       <Sidebar />
       <div className="main">
+        {user?.impersonating && (
+          <div className="no-print" style={{ background: '#8a4c00', color: '#fff', padding: '8px 16px', display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>Support mode: viewing <strong>{user.org_name}</strong> as {user.email} (operator {user.impersonating.admin_email})</span>
+            <button type="button" className="btn sm" style={{ background: '#fff', color: '#8a4c00' }} onClick={endImpersonation}>End session</button>
+          </div>
+        )}
         <header className="topbar no-print">
           <GlobalSearch />
           <div className="spacer" />

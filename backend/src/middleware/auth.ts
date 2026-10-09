@@ -6,11 +6,26 @@ import { query } from '../db.js';
 import { HttpError, forbidden } from '../lib/errors.js';
 import { hasPermission } from '../lib/permissions.js';
 
-export function signToken(user: any) {
+export function signToken(user: any, extra: Record<string, unknown> = {}) {
   return jwt.sign(
-    { sub: user.id, org: user.org_id },
+    { sub: user.id, org: user.org_id, ...extra },
     config.jwtSecret,
     { expiresIn: config.jwtExpiresIn as SignOptions['expiresIn'] },
+  );
+}
+
+/** Short-lived staff token for platform support impersonation. */
+export function signImpersonationToken(user: any, platformAdmin: { id: number; email: string }) {
+  return jwt.sign(
+    {
+      sub: user.id,
+      org: user.org_id,
+      typ: 'impersonation',
+      platform_admin_id: platformAdmin.id,
+      platform_admin_email: platformAdmin.email,
+    },
+    config.jwtSecret,
+    { expiresIn: '2h' },
   );
 }
 
@@ -38,6 +53,7 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
   if (payload.typ === 'portal' || payload.typ === 'platform') {
     return next(new HttpError(401, 'Please sign in'));
   }
+  const impersonating = payload.typ === 'impersonation';
   const { rows } = await query(
     `SELECT u.id, u.org_id, u.name, u.email, u.status, r.id AS role_id, r.name AS role_name,
             r.is_admin, r.permissions,
@@ -49,11 +65,20 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
   );
   const user = rows[0];
   if (!user || user.status !== 'active') return next(new HttpError(401, 'Your account is not active'));
-  const { orgAccessMessage } = await import('../lib/plans.js');
-  const blocked = orgAccessMessage({ status: user.org_status, trial_ends_at: user.trial_ends_at });
-  if (blocked) return next(new HttpError(403, blocked));
+  // Impersonation may enter suspended orgs for support; normal logins cannot.
+  if (!impersonating) {
+    const { orgAccessMessage } = await import('../lib/plans.js');
+    const blocked = orgAccessMessage({ status: user.org_status, trial_ends_at: user.trial_ends_at });
+    if (blocked) return next(new HttpError(403, blocked));
+  }
   req.user = user;
   req.orgId = user.org_id;
+  if (impersonating) {
+    req.impersonating = {
+      admin_id: payload.platform_admin_id,
+      admin_email: payload.platform_admin_email,
+    };
+  }
   next();
 }
 

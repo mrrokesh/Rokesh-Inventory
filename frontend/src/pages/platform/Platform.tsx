@@ -4,9 +4,71 @@ import { APP_NAME, LOGO_SRC } from '../../brand';
 import { Badge, ErrorBox, Field, Input, PageHead, Select, Spinner, Textarea, useAction } from '../../components/ui';
 import { useToast } from '../../components/Toast';
 import { dateTime } from '../../lib/format';
+import { setToken } from '../../api';
 import { getPlatformToken, platformApi, setPlatformToken, setPlatformUnauthorizedHandler } from '../../platformApi';
 
 type Admin = { id: number; name: string; email: string };
+
+const MODULE_LABELS: Record<string, string> = {
+  shopify: 'Shopify', shiprocket: 'Shiprocket', portal: 'Customer portal', announcements: 'Announcements', sms: 'SMS',
+};
+
+function DashboardHome() {
+  const navigate = useNavigate();
+  const [data, setData] = useState(null);
+  useEffect(() => { platformApi.get('/dashboard').then(setData).catch(() => {}); }, []);
+  if (!data) return <Spinner />;
+  const t = data.totals || {};
+  return (
+    <>
+      <PageHead title="Overview" />
+      <div className="grid-2 mb" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
+        {[
+          ['Organizations', t.orgs], ['Active', t.active_orgs], ['Trial', t.trial_orgs],
+          ['Suspended', t.suspended_orgs], ['Past due', t.past_due], ['Active users', t.active_users],
+        ].map(([l, n]) => (
+          <div key={l as string} className="card"><div className="card-body"><div className="small faint">{l}</div><div className="bold" style={{ fontSize: 22 }}>{n ?? 0}</div></div></div>
+        ))}
+      </div>
+      {!data.billing_configured && (
+        <div className="info-box mb">Platform Razorpay is not configured. Set PLATFORM_RAZORPAY_KEY_ID / KEY_SECRET / WEBHOOK_SECRET on the API to collect client subscriptions.</div>
+      )}
+      <div className="grid-2" style={{ alignItems: 'start' }}>
+        <div className="card"><div className="card-body">
+          <h3 style={{ marginTop: 0 }}>Trials ending (14 days)</h3>
+          <table className="table">
+            <thead><tr><th>Organization</th><th>Plan</th><th>Ends</th></tr></thead>
+            <tbody>
+              {!(data.trials_ending || []).length && <tr><td colSpan={3} className="faint center">No trials ending soon.</td></tr>}
+              {(data.trials_ending || []).map((o) => (
+                <tr key={o.id} className="clickable" onClick={() => navigate(`/platform/orgs/${o.id}`)}>
+                  <td><span className="bold">{o.name}</span></td>
+                  <td>{o.plan_name || '—'}</td>
+                  <td>{o.trial_ends_at ? dateTime(o.trial_ends_at) : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div></div>
+        <div className="card"><div className="card-body">
+          <h3 style={{ marginTop: 0 }}>Recently created</h3>
+          <table className="table">
+            <thead><tr><th>Organization</th><th>Status</th><th>Created</th></tr></thead>
+            <tbody>
+              {(data.recent_orgs || []).map((o) => (
+                <tr key={o.id} className="clickable" onClick={() => navigate(`/platform/orgs/${o.id}`)}>
+                  <td><span className="bold">{o.name}</span><div className="small faint">{o.plan_name}</div></td>
+                  <td><Badge status={o.status} /></td>
+                  <td>{dateTime(o.created_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div></div>
+      </div>
+    </>
+  );
+}
 
 function PlatformLogin({ onOk }: { onOk: (a: Admin) => void }) {
   const [f, setF] = useState({ email: '', password: '' });
@@ -198,6 +260,19 @@ function OrgDetail() {
   return (
     <>
       <PageHead title={org.name}>
+        <button type="button" className="btn" disabled={busy} onClick={async () => {
+          const r = await run(() => platformApi.post(`/orgs/${id}/impersonate`, {}));
+          if (r?.token) {
+            setToken(r.token);
+            window.location.href = '/';
+          }
+        }}>Login as client</button>
+        <button type="button" className="btn" disabled={busy} onClick={async () => {
+          const r = await run(() => platformApi.post(`/orgs/${id}/billing-link`, {}), 'Payment link created');
+          if (r?.url) {
+            try { await navigator.clipboard.writeText(r.url); toast('Payment link copied'); } catch { window.prompt('Payment link', r.url); }
+          }
+        }}>Payment link</button>
         <Link className="btn" to="/platform/orgs">← All orgs</Link>
       </PageHead>
       <div className="grid-2" style={{ alignItems: 'start' }}>
@@ -268,20 +343,23 @@ function PlansPage() {
   return (
     <>
       <PageHead title="Plans" />
-      <p className="muted">Limits enforce how many users, warehouses, and items each client can create. Leave blank for unlimited.</p>
+      <p className="muted">Limits and module flags apply per client. Monthly price is used for Razorpay payment links.</p>
       {(data.data || []).map((p) => (
-        <PlanEditor key={p.id} plan={p} busy={busy} onSave={save} />
+        <PlanEditor key={p.id} plan={p} busy={busy} onSave={save} moduleKeys={data.module_keys} />
       ))}
     </>
   );
 }
 
-function PlanEditor({ plan, busy, onSave }) {
+function PlanEditor({ plan, busy, onSave, moduleKeys }) {
+  const mods = plan.modules || {};
   const [f, setF] = useState({
     ...plan,
     max_users: plan.max_users ?? '',
     max_warehouses: plan.max_warehouses ?? '',
     max_items: plan.max_items ?? '',
+    price_monthly: plan.price_monthly ?? 0,
+    modules: Object.fromEntries((moduleKeys || Object.keys(MODULE_LABELS)).map((k) => [k, mods[k] !== false])),
   });
   const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }));
   return (
@@ -291,16 +369,29 @@ function PlanEditor({ plan, busy, onSave }) {
         <label className="checkbox"><input type="checkbox" checked={f.is_active !== false} onChange={(e) => set('is_active')(e.target.checked)} /> Active</label>
       </div>
       <Field label="Display name"><Input value={f.name} onChange={set('name')} /></Field>
+      <Field label="Monthly price (INR)"><Input type="number" value={f.price_monthly} onChange={set('price_monthly')} /></Field>
       <div className="grid-2">
         <Field label="Max users"><Input type="number" value={f.max_users} onChange={set('max_users')} placeholder="Unlimited" /></Field>
         <Field label="Max warehouses"><Input type="number" value={f.max_warehouses} onChange={set('max_warehouses')} placeholder="Unlimited" /></Field>
       </div>
       <Field label="Max items"><Input type="number" value={f.max_items} onChange={set('max_items')} placeholder="Unlimited" /></Field>
+      <div>
+        <div className="small faint mb">Modules</div>
+        <div className="row" style={{ flexWrap: 'wrap', gap: 12 }}>
+          {Object.keys(f.modules || {}).map((k) => (
+            <label key={k} className="checkbox">
+              <input type="checkbox" checked={!!f.modules[k]} onChange={(e) => setF((x) => ({ ...x, modules: { ...x.modules, [k]: e.target.checked } }))} />
+              {MODULE_LABELS[k] || k}
+            </label>
+          ))}
+        </div>
+      </div>
       <button type="button" className="btn primary" disabled={busy} onClick={() => onSave({
         ...f,
         max_users: f.max_users === '' ? null : Number(f.max_users),
         max_warehouses: f.max_warehouses === '' ? null : Number(f.max_warehouses),
         max_items: f.max_items === '' ? null : Number(f.max_items),
+        price_monthly: Number(f.price_monthly) || 0,
       })}>Save plan</button>
     </div></div>
   );
@@ -389,6 +480,7 @@ function PlatformShell({ admin, onLogout }: { admin: Admin; onLogout: () => void
           </div>
         </div>
         <nav style={{ flex: 1, overflow: 'auto', padding: '0 8px' }}>
+          <NavLink to="/platform" end className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>Overview</NavLink>
           <NavLink to="/platform/orgs" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>Organizations</NavLink>
           <NavLink to="/platform/plans" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>Plans</NavLink>
           <NavLink to="/platform/admins" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>Admins</NavLink>
@@ -403,14 +495,14 @@ function PlatformShell({ admin, onLogout }: { admin: Admin; onLogout: () => void
         <div className="content">
           <div className="page">
             <Routes>
-              <Route index element={<Navigate to="orgs" replace />} />
+              <Route index element={<DashboardHome />} />
               <Route path="orgs" element={<OrgsList />} />
               <Route path="orgs/new" element={<NewOrg />} />
               <Route path="orgs/:id" element={<OrgDetail />} />
               <Route path="plans" element={<PlansPage />} />
               <Route path="admins" element={<AdminsPage />} />
               <Route path="audit" element={<AuditPage />} />
-              <Route path="*" element={<Navigate to="/platform/orgs" replace />} />
+              <Route path="*" element={<Navigate to="/platform" replace />} />
             </Routes>
           </div>
         </div>

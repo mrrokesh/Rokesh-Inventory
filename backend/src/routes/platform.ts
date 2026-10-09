@@ -2,14 +2,15 @@ import { Router } from 'express';
 import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { query, tx } from '../db.js';
-import { authenticatePlatform, signPlatformToken } from '../middleware/auth.js';
+import { authenticatePlatform, signImpersonationToken, signPlatformToken } from '../middleware/auth.js';
 import { HttpError, badRequest, conflict, notFound } from '../lib/errors.js';
-import { str, email, oneOf, int, id, listParams } from '../lib/validate.js';
+import { str, email, oneOf, int, id, listParams, num } from '../lib/validate.js';
 import { setupOrganization } from '../lib/orgSetup.js';
 import { platformAudit } from '../lib/platformAudit.js';
-import { usageCounts } from '../lib/plans.js';
+import { PLAN_MODULE_KEYS, usageCounts } from '../lib/plans.js';
 import { appUrl } from '../lib/mailer.js';
 import { config } from '../config.js';
+import { createSaasPaymentLink, platformBillingConfigured } from '../lib/saasBilling.js';
 
 const r = Router();
 
@@ -67,13 +68,60 @@ r.post('/auth/login', async (req, res) => {
 r.use(authenticatePlatform);
 
 r.get('/auth/me', async (req, res) => {
-  res.json({ id: req.platformAdmin.id, name: req.platformAdmin.name, email: req.platformAdmin.email });
+  res.json({
+    id: req.platformAdmin.id,
+    name: req.platformAdmin.name,
+    email: req.platformAdmin.email,
+    billing_configured: platformBillingConfigured(),
+  });
+});
+
+function parseModules(raw) {
+  const src = raw && typeof raw === 'object' ? raw : {};
+  const out = {};
+  for (const k of PLAN_MODULE_KEYS) out[k] = src[k] !== false && src[k] !== 'false';
+  return out;
+}
+
+// ------------------------------------------------------------------ dashboard
+r.get('/dashboard', async (_req, res) => {
+  const [{ rows: byStatus }, { rows: trials }, { rows: [totals] }, { rows: recent }] = await Promise.all([
+    query(`SELECT status, COUNT(*)::int AS n FROM organizations GROUP BY status`),
+    query(
+      `SELECT o.id, o.name, o.email, o.status, o.trial_ends_at, p.name AS plan_name
+         FROM organizations o LEFT JOIN plans p ON p.id = o.plan_id
+        WHERE o.status = 'trial' AND o.trial_ends_at IS NOT NULL
+          AND o.trial_ends_at <= now() + interval '14 days'
+        ORDER BY o.trial_ends_at ASC LIMIT 50`,
+    ),
+    query(
+      `SELECT
+         (SELECT COUNT(*)::int FROM organizations) AS orgs,
+         (SELECT COUNT(*)::int FROM organizations WHERE status = 'active') AS active_orgs,
+         (SELECT COUNT(*)::int FROM organizations WHERE status = 'trial') AS trial_orgs,
+         (SELECT COUNT(*)::int FROM organizations WHERE status = 'suspended') AS suspended_orgs,
+         (SELECT COUNT(*)::int FROM organizations WHERE subscription_status = 'past_due') AS past_due,
+         (SELECT COUNT(*)::int FROM users WHERE status = 'active') AS active_users`,
+    ),
+    query(
+      `SELECT o.id, o.name, o.status, o.created_at, p.name AS plan_name
+         FROM organizations o LEFT JOIN plans p ON p.id = o.plan_id
+        ORDER BY o.created_at DESC LIMIT 10`,
+    ),
+  ]);
+  res.json({
+    totals: totals || {},
+    by_status: Object.fromEntries(byStatus.map((r) => [r.status, r.n])),
+    trials_ending: trials,
+    recent_orgs: recent,
+    billing_configured: platformBillingConfigured(),
+  });
 });
 
 // ------------------------------------------------------------------ plans
 r.get('/plans', async (_req, res) => {
   const { rows } = await query('SELECT * FROM plans ORDER BY sort_order, id');
-  res.json({ data: rows });
+  res.json({ data: rows, module_keys: PLAN_MODULE_KEYS });
 });
 
 r.post('/plans', async (req, res) => {
@@ -81,17 +129,18 @@ r.post('/plans', async (req, res) => {
   const code = str(b.code, { field: 'Code', required: true, max: 40 }).toLowerCase().replace(/\s+/g, '_');
   const name = str(b.name, { field: 'Name', required: true, max: 120 });
   const { rows: [row] } = await query(
-    `INSERT INTO plans (code, name, description, max_users, max_warehouses, max_items, modules, sort_order, is_active)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+    `INSERT INTO plans (code, name, description, max_users, max_warehouses, max_items, modules, sort_order, is_active, price_monthly)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
     [
       code, name,
       str(b.description, { field: 'Description', max: 500 }) || null,
       b.max_users == null || b.max_users === '' ? null : int(b.max_users, { field: 'Max users', min: 1 }),
       b.max_warehouses == null || b.max_warehouses === '' ? null : int(b.max_warehouses, { field: 'Max warehouses', min: 1 }),
       b.max_items == null || b.max_items === '' ? null : int(b.max_items, { field: 'Max items', min: 1 }),
-      JSON.stringify(b.modules || {}),
+      JSON.stringify(parseModules(b.modules)),
       int(b.sort_order, { field: 'Sort', def: 0 }),
       b.is_active !== false,
+      num(b.price_monthly, { field: 'Price', min: 0, def: 0 }),
     ],
   );
   await platformAudit(req.platformAdmin.id, 'create', 'plan', row.id, `Plan ${row.name} created`);
@@ -105,7 +154,7 @@ r.put('/plans/:id', async (req, res) => {
   const b = { ...cur, ...req.body };
   const { rows: [row] } = await query(
     `UPDATE plans SET name=$2, description=$3, max_users=$4, max_warehouses=$5, max_items=$6,
-            modules=$7, sort_order=$8, is_active=$9 WHERE id=$1 RETURNING *`,
+            modules=$7, sort_order=$8, is_active=$9, price_monthly=$10 WHERE id=$1 RETURNING *`,
     [
       planId,
       str(b.name, { field: 'Name', required: true, max: 120 }),
@@ -113,9 +162,10 @@ r.put('/plans/:id', async (req, res) => {
       b.max_users == null || b.max_users === '' ? null : int(b.max_users, { field: 'Max users', min: 1 }),
       b.max_warehouses == null || b.max_warehouses === '' ? null : int(b.max_warehouses, { field: 'Max warehouses', min: 1 }),
       b.max_items == null || b.max_items === '' ? null : int(b.max_items, { field: 'Max items', min: 1 }),
-      JSON.stringify(b.modules || cur.modules || {}),
+      JSON.stringify(parseModules(b.modules ?? cur.modules)),
       int(b.sort_order, { field: 'Sort', def: cur.sort_order }),
       b.is_active !== false,
+      num(b.price_monthly ?? cur.price_monthly, { field: 'Price', min: 0, def: 0 }),
     ],
   );
   await platformAudit(req.platformAdmin.id, 'update', 'plan', planId, `Plan ${row.name} updated`);
@@ -391,6 +441,57 @@ r.put('/admins/:id', async (req, res) => {
   );
   await platformAudit(req.platformAdmin.id, 'update', 'platform_admin', adminId, `Platform admin ${row.email} updated`);
   res.json(row);
+});
+
+r.post('/orgs/:id/impersonate', async (req, res) => {
+  const orgId = Number(req.params.id);
+  const { rows: [org] } = await query('SELECT id, name, status FROM organizations WHERE id = $1', [orgId]);
+  if (!org) throw notFound('Organization');
+  const userId = req.body?.user_id ? Number(req.body.user_id) : null;
+  const { rows } = await query(
+    userId
+      ? `SELECT u.id, u.org_id, u.name, u.email, u.status FROM users u
+          WHERE u.org_id = $1 AND u.id = $2 AND u.status = 'active'`
+      : `SELECT u.id, u.org_id, u.name, u.email, u.status FROM users u
+           JOIN roles r ON r.id = u.role_id
+          WHERE u.org_id = $1 AND u.status = 'active'
+          ORDER BY r.is_admin DESC, u.last_login_at DESC NULLS LAST
+          LIMIT 1`,
+    userId ? [orgId, userId] : [orgId],
+  );
+  const user = rows[0];
+  if (!user) throw badRequest('No active user to impersonate. Invite an admin first.');
+  await platformAudit(
+    req.platformAdmin.id, 'impersonate', 'organization', orgId,
+    `Impersonating ${user.email} on ${org.name}`,
+    { user_id: user.id },
+  );
+  const token = signImpersonationToken(user, req.platformAdmin);
+  const { rows: sessionRows } = await query(
+    `SELECT u.id, u.name, u.email, u.org_id, r.id AS role_id, r.name AS role_name, r.is_admin, r.permissions,
+            o.name AS org_name, o.currency, o.logo_path, o.gst_registered, o.date_format, o.state AS org_state, o.portal_slug,
+            o.status AS org_status, o.trial_ends_at, o.plan_id, p.code AS plan_code, p.name AS plan_name,
+            p.modules AS plan_modules
+       FROM users u JOIN roles r ON r.id = u.role_id JOIN organizations o ON o.id = u.org_id
+       LEFT JOIN plans p ON p.id = o.plan_id WHERE u.id = $1`,
+    [user.id],
+  );
+  res.json({
+    token,
+    user: {
+      ...sessionRows[0],
+      impersonating: { admin_id: req.platformAdmin.id, admin_email: req.platformAdmin.email },
+    },
+  });
+});
+
+r.post('/orgs/:id/billing-link', async (req, res) => {
+  const orgId = Number(req.params.id);
+  const { rows: [org] } = await query('SELECT id, name FROM organizations WHERE id = $1', [orgId]);
+  if (!org) throw notFound('Organization');
+  const link = await createSaasPaymentLink(orgId, { createdBy: `platform:${req.platformAdmin.email}` });
+  await platformAudit(req.platformAdmin.id, 'billing_link', 'organization', orgId, `Payment link created for ${org.name}`);
+  res.status(201).json(link);
 });
 
 // ------------------------------------------------------------------ audit

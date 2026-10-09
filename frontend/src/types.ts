@@ -13,6 +13,12 @@ export type SessionUser = {
   integrations?: string[];
   org_state?: string;
   gst_enabled?: boolean;
+  plan_modules?: Record<string, boolean>;
+  plan_name?: string;
+  org_status?: string;
+  subscription_status?: string;
+  paid_until?: string;
+  impersonating?: { admin_id: number; admin_email: string } | null;
 };
 
 export type PageResult<T> = {

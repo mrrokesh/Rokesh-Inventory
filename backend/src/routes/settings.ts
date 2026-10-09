@@ -15,6 +15,7 @@ import { TAG_MODULES } from '../lib/reportingTags.js';
 import { emailLink } from './email.js';
 import { appUrl } from '../lib/mailer.js';
 import { assertWithinLimit, orgPlan, usageCounts } from '../lib/plans.js';
+import { createSaasPaymentLink, platformBillingConfigured } from '../lib/saasBilling.js';
 
 const r = Router();
 
@@ -33,6 +34,34 @@ r.get('/plan', async (req, res) => {
   const plan = await orgPlan(req.orgId);
   const usage = await usageCounts(req.orgId);
   res.json({ ...(plan || {}), usage });
+});
+
+r.get('/billing', requireAdmin, async (req, res) => {
+  const { rows: [org] } = await query(
+    `SELECT o.id, o.name, o.status, o.subscription_status, o.paid_until, o.trial_ends_at, o.last_payment_id,
+            p.id AS plan_id, p.name AS plan_name, p.code AS plan_code, p.price_monthly, p.modules
+       FROM organizations o LEFT JOIN plans p ON p.id = o.plan_id WHERE o.id = $1`,
+    [req.orgId],
+  );
+  const { rows: payments } = await query(
+    `SELECT id, amount, currency, status, razorpay_payment_id, razorpay_link_id, created_at
+       FROM platform_payments WHERE org_id = $1 ORDER BY created_at DESC LIMIT 20`,
+    [req.orgId],
+  );
+  res.json({
+    ...org,
+    usage: await usageCounts(req.orgId),
+    payments,
+    billing_configured: platformBillingConfigured(),
+    support_email: (await import('../config.js')).config.supportEmail,
+  });
+});
+
+r.post('/billing/subscribe', requireAdmin, async (req, res) => {
+  if (req.impersonating) throw badRequest('Cannot start billing while impersonating');
+  const link = await createSaasPaymentLink(req.orgId, { createdBy: `org:${req.user.email}` });
+  await audit({ query }, req, 'create', 'billing', req.orgId, 'SaaS payment link created');
+  res.status(201).json(link);
 });
 
 r.put('/organization', can('settings', 'edit'), async (req, res) => {

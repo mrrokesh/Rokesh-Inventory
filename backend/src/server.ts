@@ -40,6 +40,7 @@ import platformRoutes from './routes/platform.js';
 import { handleRazorpayWebhook, startIntegrationScheduler } from './lib/integrations.js';
 import { startWebhookWorker } from './lib/webhooks.js';
 import { bootstrapPlatformAdmin } from './lib/bootstrapPlatform.js';
+import { handlePlatformRazorpayWebhook, startBillingEnforcer } from './lib/saasBilling.js';
 
 const app = express();
 app.disable('x-powered-by');
@@ -64,6 +65,15 @@ app.post('/api/hooks/razorpay/:slug', express.raw({ type: '*/*', limit: '1mb' })
     res.status(500).json({ ok: false });
   }
 });
+app.post('/api/hooks/platform-razorpay', express.raw({ type: '*/*', limit: '1mb' }), async (req, res) => {
+  try {
+    const r = await handlePlatformRazorpayWebhook(req.body, req.get('x-razorpay-signature'));
+    res.status(r.status).json({ ok: r.status === 200, error: r.error });
+  } catch (err) {
+    console.error('Platform Razorpay webhook error:', err.message);
+    res.status(500).json({ ok: false });
+  }
+});
 app.use(express.json({ limit: '5mb' }));
 app.use((_req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -72,6 +82,14 @@ app.use((_req, res, next) => {
 });
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
+app.get('/api/public/pricing', async (_req, res) => {
+  const { query } = await import('./db.js');
+  const { rows } = await query(
+    `SELECT code, name, description, max_users, max_warehouses, max_items, modules, price_monthly
+       FROM plans WHERE is_active ORDER BY sort_order, id`,
+  );
+  res.json({ data: rows, support_email: config.supportEmail, currency: 'INR' });
+});
 app.use('/uploads/public', express.static(publicDir, { maxAge: '7d', fallthrough: false }));
 
 app.use('/api/auth', authRoutes);
@@ -143,6 +161,7 @@ migrate()
     startWorkflowWorkers();
     startReportScheduler();
     startIntegrationScheduler();
+    startBillingEnforcer();
   })
   .catch((err) => {
     console.error('Could not start:', err.message);

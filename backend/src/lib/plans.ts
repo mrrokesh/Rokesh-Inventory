@@ -1,7 +1,11 @@
 import { query } from '../db.js';
-import { badRequest } from './errors.js';
+import { badRequest, forbidden } from './errors.js';
 
 export type PlanLimitKind = 'users' | 'warehouses' | 'items';
+
+/** Feature flags stored on plans.modules JSONB */
+export const PLAN_MODULE_KEYS = ['shopify', 'shiprocket', 'portal', 'announcements', 'sms'] as const;
+export type PlanModuleKey = (typeof PLAN_MODULE_KEYS)[number];
 
 const COUNT_SQL: Record<PlanLimitKind, string> = {
   users: `SELECT COUNT(*)::int AS n FROM users WHERE org_id = $1 AND status IN ('active','invited')`,
@@ -68,4 +72,27 @@ export function orgAccessMessage(org) {
 
 export function isOrgAccessible(org) {
   return !orgAccessMessage(org);
+}
+
+export function modulesEnabled(modules: any): Record<string, boolean> {
+  const m = modules && typeof modules === 'object' ? modules : {};
+  const out: Record<string, boolean> = {};
+  for (const k of PLAN_MODULE_KEYS) out[k] = m[k] !== false;
+  return out;
+}
+
+/** Throws 403 if the org plan disables this module. Missing plan = all allowed. */
+export async function assertModule(orgId, key: PlanModuleKey) {
+  const plan = await orgPlan(orgId);
+  if (!plan?.modules) return;
+  const enabled = modulesEnabled(plan.modules);
+  if (!enabled[key]) {
+    throw forbidden(`Your ${plan.plan_name || 'current'} plan does not include ${key}. Contact support to upgrade.`);
+  }
+}
+
+export async function hasModule(orgId, key: PlanModuleKey) {
+  const plan = await orgPlan(orgId);
+  if (!plan?.modules) return true;
+  return modulesEnabled(plan.modules)[key] !== false;
 }

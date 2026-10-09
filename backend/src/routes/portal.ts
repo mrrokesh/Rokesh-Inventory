@@ -334,6 +334,8 @@ function portalAdminFor(type) {
         await audit(client, req, 'update', type, c.id, `${label} portal turned off for ${c.display_name}`);
         return { enabled: false };
       }
+      const { assertModule } = await import('../lib/plans.js');
+      await assertModule(req.orgId, 'portal');
       if (!c.email) throw badRequest(`Add an email address to this ${type} first — they sign in to the portal with it`);
       const token = crypto.randomBytes(24).toString('hex');
       await client.query('UPDATE contacts SET portal_enabled = TRUE, portal_token = $2 WHERE id = $1', [c.id, token]);

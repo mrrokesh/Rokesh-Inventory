@@ -7,6 +7,7 @@ declare global {
       contact?: any;
       org?: any;
       platformAdmin?: any;
+      impersonating?: { admin_id: number; admin_email: string };
     }
   }
 }

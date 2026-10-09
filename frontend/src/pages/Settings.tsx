@@ -5,7 +5,7 @@ import { useAuth } from '../auth';
 import { invalidateLookups } from '../lib/lookups';
 import { dateTime, label, money, INDIAN_STATES } from '../lib/format';
 import DataTable from '../components/DataTable';
-import { Badge, Checkbox, ErrorBox, Field, FormRow, Input, Modal, PageHead, Select, Spinner, Textarea, confirmDialog, useAction, useApi } from '../components/ui';
+import { Badge, Checkbox, EmptyState, ErrorBox, Field, FormRow, Input, Modal, PageHead, Select, Spinner, Textarea, confirmDialog, useAction, useApi } from '../components/ui';
 import { useToast } from '../components/Toast';
 import { Developer, EmailSettings, Integrations } from './SettingsExtra';
 import { BrandingSettings, CurrenciesSettings, CustomFieldsSettings, ReportingTagsSettings, TemplatesSettings } from './SettingsCustom';
@@ -452,19 +452,71 @@ function AuditLog() {
 
 // ------------------------------------------------------------------ shell
 const LINKS = [
-  ['organization', 'Organization profile'], ['branding', 'Branding'], ['warehouses', 'Warehouses'], ['taxes', 'Taxes'], ['currencies', 'Currencies'], ['units', 'Units'], ['numbering', 'Number series'], ['custom-fields', 'Custom fields'], ['reporting-tags', 'Reporting tags'], ['templates', 'PDF templates'], ['workflows', 'Workflow rules'], ['custom-modules', 'Custom modules'], ['web-forms', 'Web forms'], ['web-tabs', 'Web tabs'],
+  ['organization', 'Organization profile'], ['branding', 'Branding'], ['billing', 'Billing'], ['warehouses', 'Warehouses'], ['taxes', 'Taxes'], ['currencies', 'Currencies'], ['units', 'Units'], ['numbering', 'Number series'], ['custom-fields', 'Custom fields'], ['reporting-tags', 'Reporting tags'], ['templates', 'PDF templates'], ['workflows', 'Workflow rules'], ['custom-modules', 'Custom modules'], ['web-forms', 'Web forms'], ['web-tabs', 'Web tabs'],
   ['carriers', 'Shipping carriers'], ['email', 'Email'], ['announcements', 'Announcements'], ['integrations', 'Integrations'],
   ['developer', 'API keys & webhooks', 'users'], ['users', 'Users', 'users'], ['roles', 'Roles & permissions', 'users'], ['audit', 'Audit log', 'reports'],
 ];
 
+function Billing() {
+  const toast = useToast();
+  const [busy, run] = useAction(toast);
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+  const load = () => api.get('/settings/billing').then(setData).catch(setError);
+  useEffect(() => { load(); }, []);
+  if (error) return <ErrorBox error={error} />;
+  if (!data) return <Spinner />;
+  const pay = async () => {
+    const r = await run(() => api.post('/settings/billing/subscribe', {}), 'Opening payment link…');
+    if (r?.url) window.open(r.url, '_blank', 'noopener');
+  };
+  return (
+    <>
+      <PageHead title="Billing">
+        {data.billing_configured && Number(data.price_monthly) > 0 && (
+          <button type="button" className="btn primary" disabled={busy} onClick={pay}>Pay / renew</button>
+        )}
+      </PageHead>
+      <div className="card mb"><div className="card-body grid-2">
+        <div><div className="small faint">Plan</div><div className="bold">{data.plan_name || '—'}</div></div>
+        <div><div className="small faint">Org status</div><div><Badge status={data.status} /></div></div>
+        <div><div className="small faint">Subscription</div><div><Badge status={data.subscription_status || 'none'} /></div></div>
+        <div><div className="small faint">Paid until</div><div>{data.paid_until ? dateTime(data.paid_until) : '—'}</div></div>
+        <div><div className="small faint">Monthly price</div><div>{data.price_monthly != null ? `₹${Number(data.price_monthly).toLocaleString('en-IN')}` : '—'}</div></div>
+        <div><div className="small faint">Support</div><div><a href={`mailto:${data.support_email}`}>{data.support_email}</a></div></div>
+      </div></div>
+      {!data.billing_configured && (
+        <p className="muted">Online payment is not enabled yet. Contact {data.support_email} to renew or change your plan.</p>
+      )}
+      <div className="card"><table className="table">
+        <thead><tr><th>Date</th><th>Amount</th><th>Status</th><th>Reference</th></tr></thead>
+        <tbody>
+          {!(data.payments || []).length && <tr><td colSpan={4} className="faint center">No payments yet.</td></tr>}
+          {(data.payments || []).map((p) => (
+            <tr key={p.id}>
+              <td>{dateTime(p.created_at)}</td>
+              <td>₹{Number(p.amount).toLocaleString('en-IN')} {p.currency}</td>
+              <td><Badge status={p.status} /></td>
+              <td className="mono small">{p.razorpay_payment_id || p.razorpay_link_id || '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table></div>
+    </>
+  );
+}
+
 function AnnouncementsAdmin() {
-  const { can } = useAuth();
+  const { can, hasModule } = useAuth();
   const toast = useToast();
   const [busy, run] = useAction(toast);
   const { data, reload } = useApi('/announcements', { per_page: 100 });
   const [show, setShow] = useState(false);
   const [f, setF] = useState({ title: '', body: '', status: 'published', pinned: false });
   const editable = can('settings', 'edit');
+  if (!hasModule('announcements')) {
+    return <EmptyState title="Not on your plan" text="Announcements are not included in your current plan. Contact support to upgrade." />;
+  }
   const save = async () => {
     if ((await run(() => api.post('/announcements', f), 'Announcement published')) !== undefined) {
       setShow(false); setF({ title: '', body: '', status: 'published', pinned: false }); reload();
@@ -540,6 +592,7 @@ export default function Settings() {
           <Routes>
             <Route index element={<Navigate to="organization" replace />} />
             <Route path="organization" element={<Organization />} />
+            <Route path="billing" element={<Billing />} />
             <Route path="branding" element={<BrandingSettings />} />
             <Route path="custom-fields" element={<CustomFieldsSettings />} />
             <Route path="reporting-tags" element={<ReportingTagsSettings />} />

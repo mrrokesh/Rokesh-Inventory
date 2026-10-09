@@ -97,6 +97,8 @@ function parse(b) {
 }
 
 r.post('/', can('settings', 'edit'), async (req, res) => {
+  const { assertModule } = await import('../lib/plans.js');
+  await assertModule(req.orgId, 'announcements');
   const a = parse(req.body || {});
   const result = await tx(async (client) => {
     const { rows: [row] } = await client.query(

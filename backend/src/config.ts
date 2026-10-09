@@ -25,4 +25,9 @@ export const config = {
   platformAdminPassword: process.env.PLATFORM_ADMIN_PASSWORD || '',
   platformAdminName: process.env.PLATFORM_ADMIN_NAME || 'Platform Admin',
   trialDays: Number(process.env.TRIAL_DAYS || 14),
+  supportEmail: process.env.SUPPORT_EMAIL || 'support@rokesh.com',
+  /** Platform SaaS billing (charges your clients) — separate from per-org invoice Razorpay */
+  platformRazorpayKeyId: process.env.PLATFORM_RAZORPAY_KEY_ID || '',
+  platformRazorpayKeySecret: process.env.PLATFORM_RAZORPAY_KEY_SECRET || '',
+  platformRazorpayWebhookSecret: process.env.PLATFORM_RAZORPAY_WEBHOOK_SECRET || '',
 };

@@ -195,7 +195,7 @@ function IntegrationCard({ it, onSaved, warehouses }: any) {
 }
 
 export function Integrations() {
-  const { refresh } = useAuth();
+  const { refresh, hasModule } = useAuth();
   const { data, error, reload } = useApi('/integrations');
   const { warehouses } = useLookups('warehouses');
   if (error) return <ErrorBox error={error} />;
@@ -204,7 +204,17 @@ export function Integrations() {
     <>
       <PageHead title="Integrations" />
       <p className="muted" style={{ marginTop: 0 }}>Connect payment, shipping and online-store services using your own accounts. Keys are stored encrypted. Want to connect something else (Tally, Zapier, your website)? Use <Link to="/settings/developer">API keys & webhooks</Link>.</p>
-      {data.map((it) => <IntegrationCard key={it.provider} it={it} warehouses={warehouses} onSaved={() => { reload(); refresh(); }} />)}
+      {data.map((it) => {
+        const gated = ['shopify', 'shiprocket'].includes(it.provider) && !hasModule(it.provider);
+        return (
+          <div key={it.provider}>
+            {gated && <p className="small muted">Your plan does not include {it.name}. Contact support to upgrade.</p>}
+            <div style={gated ? { opacity: 0.55, pointerEvents: 'none' } : undefined}>
+              <IntegrationCard it={it} warehouses={warehouses} onSaved={() => { reload(); refresh(); }} />
+            </div>
+          </div>
+        );
+      })}
     </>
   );
 }

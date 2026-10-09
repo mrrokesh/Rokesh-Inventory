@@ -9,6 +9,7 @@ type AuthContextValue = {
   logout: () => void;
   refresh: () => Promise<SessionUser>;
   can: (module: string, action?: PermissionAction | string) => boolean;
+  hasModule: (key: string) => boolean;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -37,9 +38,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return Array.isArray(user.permissions?.[module]) && user.permissions[module].includes(action);
   }, [user]);
 
+  const hasModule = useCallback((key: string) => {
+    if (!user) return false;
+    const m = user.plan_modules;
+    if (!m || typeof m !== 'object') return true;
+    return m[key] !== false;
+  }, [user]);
+
   const value = useMemo(
-    () => ({ user, loading, startSession, logout, refresh, can }),
-    [user, loading, startSession, logout, refresh, can],
+    () => ({ user, loading, startSession, logout, refresh, can, hasModule }),
+    [user, loading, startSession, logout, refresh, can, hasModule],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

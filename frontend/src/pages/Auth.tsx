@@ -55,6 +55,7 @@ export function Login() {
         <Field label="Password"><Input type="password" autoComplete="current-password" required value={f.password} onChange={(v) => setF({ ...f, password: v })} /></Field>
         <button className="btn primary" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
         {signupOpen && <div className="small muted center">New here? <Link to="/signup">Create an organization</Link></div>}
+        <div className="small muted center"><Link to="/pricing">Pricing</Link> · <Link to="/support">Support</Link></div>
         <div className="small faint center">Forgot your password? Ask your administrator for a password reset link (Settings → Users).</div>
       </form>
     </AuthShell>

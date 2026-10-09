@@ -37,6 +37,11 @@ r.get('/', can('settings', 'view'), async (req, res) => {
 r.put('/:provider', requireAdmin, async (req, res) => {
   const p = PROVIDERS[String(req.params.provider)];
   if (!p) throw notFound('Integration');
+  const provider = String(req.params.provider);
+  if (['shopify', 'shiprocket'].includes(provider) && bool(req.body?.enabled)) {
+    const { assertModule } = await import('../lib/plans.js');
+    await assertModule(req.orgId, provider as 'shopify' | 'shiprocket');
+  }
   const b = req.body || {};
   const cur = await getIntegration(req.orgId, req.params.provider);
   const config = {};
@@ -97,6 +102,8 @@ r.post('/razorpay/payment-link/:invoiceId', can('invoices', 'edit'), async (req,
 
 // Send a text message by hand (e.g. "Send SMS" on an invoice).
 r.post('/sms/send', async (req, res) => {
+  const { assertModule } = await import('../lib/plans.js');
+  await assertModule(req.orgId, 'sms');
   const b = req.body || {};
   const result = await sendSms(req.orgId, b.to, b.message, { entityType: b.entity_type || null, entityId: Number(b.entity_id) || null, userId: req.user.id });
   await audit({ query }, req, 'update', b.entity_type || 'sms', Number(b.entity_id) || null, `SMS sent to ${result.to}`);

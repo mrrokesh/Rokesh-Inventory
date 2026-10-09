@@ -32,12 +32,13 @@ function recordFailure(key) {
   else f.count += 1;
 }
 
-async function sessionPayload(userId) {
+async function sessionPayload(userId, extra: Record<string, unknown> = {}) {
   const { rows } = await query(
     `SELECT u.id, u.name, u.email, u.org_id, r.id AS role_id, r.name AS role_name, r.is_admin, r.permissions,
             o.name AS org_name, o.currency, o.logo_path, o.gst_registered, o.date_format, o.state AS org_state, o.portal_slug,
-            o.status AS org_status, o.trial_ends_at, o.plan_id,
+            o.status AS org_status, o.trial_ends_at, o.plan_id, o.subscription_status, o.paid_until,
             p.code AS plan_code, p.name AS plan_name, p.max_users, p.max_warehouses, p.max_items, p.modules AS plan_modules,
+            p.price_monthly AS plan_price_monthly,
             (o.smtp IS NOT NULL) AS email_configured,
             COALESCE((SELECT array_agg(provider) FROM integrations WHERE org_id = o.id AND enabled), '{}') AS integrations
        FROM users u JOIN roles r ON r.id = u.role_id JOIN organizations o ON o.id = u.org_id
@@ -45,7 +46,8 @@ async function sessionPayload(userId) {
       WHERE u.id = $1`,
     [userId],
   );
-  return rows[0];
+  if (!rows[0]) return null;
+  return { ...rows[0], ...extra };
 }
 
 r.get('/signup-status', (_req, res) => {
@@ -148,7 +150,17 @@ r.post('/invite/:token', async (req, res) => {
 });
 
 r.get('/me', authenticate, async (req, res) => {
-  res.json(await sessionPayload(req.user.id));
+  res.json(await sessionPayload(req.user.id, {
+    impersonating: req.impersonating || null,
+  }));
+});
+
+r.get('/public-info', (_req, res) => {
+  res.json({
+    app_name: 'Rokesh Inventory',
+    support_email: config.supportEmail,
+    signup_open: config.signupMode === 'open',
+  });
 });
 
 r.put('/me', authenticate, async (req, res) => {

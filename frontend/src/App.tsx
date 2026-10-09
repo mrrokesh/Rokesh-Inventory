@@ -70,6 +70,7 @@ const Profile = lazy(() => import('./pages/Settings').then((m) => ({ default: m.
 const Help = lazy(() => import('./pages/help/Help'));
 const Portal = lazy(() => import('./pages/portal/Portal'));
 const Platform = lazy(() => import('./pages/platform/Platform'));
+const PublicSite = lazy(() => import('./pages/PublicSite'));
 
 function Guard({ perm, action = 'view', children }: { perm?: string; action?: string; children: ReactNode }) {
   const { can } = useAuth();
@@ -107,6 +108,13 @@ export default function App() {
     return (
       <Suspense fallback={<Spinner />}>
         <Routes><Route path="/platform/*" element={<Platform />} /></Routes>
+      </Suspense>
+    );
+  }
+  if (['/pricing', '/support', '/terms', '/privacy'].includes(location.pathname)) {
+    return (
+      <Suspense fallback={<Spinner />}>
+        <PublicSite />
       </Suspense>
     );
   }
