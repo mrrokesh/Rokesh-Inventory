@@ -33,7 +33,7 @@ services:
       - key: APP_SECRET
         sync: false
       - key: SIGNUP_MODE
-        value: invite_only
+        value: open
       - key: TRIAL_DAYS
         value: "14"
       - key: PLATFORM_ADMIN_EMAIL

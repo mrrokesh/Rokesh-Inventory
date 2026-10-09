@@ -42,13 +42,17 @@ npm run dev                 # http://localhost:5173 (proxies /api to the backend
 
 ### How users sign up
 
-Set `SIGNUP_MODE` in `backend/.env` (restart the API after changing it):
+**Default is `open`** (local `.env.example` and `render.yaml`): anyone can create an organization at `/signup`.
+
+Set `SIGNUP_MODE` in `backend/.env` (or Render Environment) and restart/redeploy the API after changing it:
 
 | Mode | Behaviour |
 |------|-----------|
 | `open` | Anyone can use **Create an organization** at `/signup`. New orgs start on the **Starter** plan in **trial** (`TRIAL_DAYS`, default 14). |
-| `invite_only` | Public signup is closed. You create each client from `/platform` and send an invite link. |
+| `invite_only` | Public signup shows “Signup closed”. You create each client from `/platform` and send an invite link. |
 | `closed` | Same as invite-only (no public signup). |
+
+If the live site still says “Signup closed”, the Render API still has `SIGNUP_MODE=invite_only` — change it to `open` in the Render dashboard (Environment) and redeploy. The Vercel UI alone cannot open signup; the API env controls it.
 
 **Platform-provisioned clients** (works in every mode):
 
@@ -86,14 +90,14 @@ Frontend goes to [Vercel](https://vercel.com), API to [Render](https://render.co
   - `APP_SECRET` — optional; defaults to `JWT_SECRET` if empty
   - `CORS_ORIGIN` — your Vercel URL, e.g. `https://rokesh-inventory.vercel.app`
   - `APP_URL` — same Vercel URL (emails, portal, payment links)
-  - `SIGNUP_MODE` — `open` for self-serve trials, or `invite_only` / `closed` if only you create clients
+  - `SIGNUP_MODE` — `open` (self-serve trials; default in `render.yaml`) or `invite_only` / `closed`
   - `PLATFORM_ADMIN_EMAIL` / `PLATFORM_ADMIN_PASSWORD` — create the first Super Admin (use a strong password; change after first login via Platform → Admins)
   - `SUPPORT_EMAIL` — shown on pricing, support and billing pages
   - `PLATFORM_RAZORPAY_KEY_ID` / `PLATFORM_RAZORPAY_KEY_SECRET` / `PLATFORM_RAZORPAY_WEBHOOK_SECRET` — optional; your Razorpay account for charging client subscriptions (webhook: `{APP_URL}/api/hooks/platform-razorpay`)
   - `NODE_ENV=production`
   - Render sets `PORT` for you
 
-After syncing `render.yaml`, set the `sync: false` secrets in the Render dashboard (platform admin password, Razorpay keys, database URL).
+After syncing `render.yaml`, set the `sync: false` secrets in the Render dashboard (platform admin password, Razorpay keys, database URL). If you previously set `SIGNUP_MODE=invite_only` manually on Render, update or remove that override so Blueprint/`open` takes effect, then redeploy.
 
 After the first deploy, copy the Render URL (`https://….onrender.com`). Disk uploads on Render’s free instance are wiped on restart.
 
