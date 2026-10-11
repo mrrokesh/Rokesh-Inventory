@@ -1,5 +1,6 @@
 // Small inline stroke icon set (24x24 viewBox).
 const PATHS = {
+  refresh: 'M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7',
   home: 'M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
   items: 'M3 7l9-4 9 4v10l-9 4-9-4zM3 7l9 4 9-4M12 11v10',
   inventory: 'M4 4h16v6H4zM4 14h7v6H4zM15 14h5v6h-5z',

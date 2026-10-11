@@ -129,11 +129,11 @@ export default function Dashboard() {
         <div style={{ marginRight: 'auto' }}>
           <h1>Hello, {user.name.split(' ')[0]}</h1>
           <div className="updated" aria-live="polite">
-            {updatedAt ? `Updated ${ago(updatedAt, now)}` : 'Loading…'}
-            {' · '}<button type="button" className="btn link small" onClick={load}>Refresh</button>
+            <span>{updatedAt ? `Updated ${ago(updatedAt, now)}` : 'Loading…'}</span>
+            <button type="button" className="refresh-btn" onClick={load} aria-label="Refresh dashboard"><Icon name="refresh" size={13} className="" /> Refresh</button>
           </div>
         </div>
-        {!editing && <div style={{ width: 170 }}><Select value={period} onChange={setPeriod} options={PERIODS} aria-label="Period" /></div>}
+        {!editing && <div className="period-select"><Select value={period} onChange={setPeriod} options={PERIODS} aria-label="Period" /></div>}
         {editing ? (
           <>
             <button type="button" className="btn" onClick={() => setGallery(true)}><Icon name="plus" size={14} className="" /> Add widgets</button>

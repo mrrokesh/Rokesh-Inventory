@@ -682,7 +682,13 @@ textarea.input { resize: vertical; min-height: 64px; }
 .gallery-item { border: 1px solid var(--border); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
 .gallery-item h4 { font-size: 14px; display: flex; align-items: center; gap: 8px; }
 .gallery-item p { margin: 0; color: var(--text-2); font-size: 12.5px; flex: 1; }
-.updated { font-size: 12px; color: var(--text-3); }
+.updated { font-size: 12px; color: var(--text-3); display: flex; align-items: center; flex-wrap: nowrap; gap: 8px; white-space: nowrap; }
+.refresh-btn {
+  display: inline-flex; align-items: center; gap: 4px; flex: none; padding: 3px 8px; border: 1px solid var(--border);
+  border-radius: 999px; background: var(--surface); color: var(--primary); font-size: 12px; cursor: pointer;
+}
+.period-select { width: 170px; }
+.refresh-btn:hover { background: var(--primary-soft); }
 
 @media (max-width: 1100px) {
   .widget-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

@@ -44,7 +44,14 @@ docs/user-guide/     help articles, also shown in the app's Help Center
 
 Imports in the frontend use the `@/` alias for `src/` (for example `import { api } from '@/api'`).
 Styling is plain CSS with CSS variables for light/dark themes. Tailwind v4 utilities are available
-(without its CSS reset), so new code can use utility classes next to the existing ones.
+(without its CSS reset), so new code can use utility classes next to the existing ones.
+
+Tailwind utilities are marked `!important`, so a utility with the same name as one of our own classes
+would override it. Our `.table` and `.grow` are excluded with `@source not inline(...)` in
+`styles/responsive.css`. If you add a component class that matches a Tailwind utility name, add it there too.
+
+Every screen is checked for horizontal overflow at 320, 375, 768, 1024 and 1440 px (small phone to desktop):
+tables scroll inside their own box, and page headers, dropdowns and modals stay within the screen.
 
 ## 1. Database
 Create an empty PostgreSQL database (PostgreSQL 13+):

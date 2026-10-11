@@ -2,6 +2,9 @@
 @layer theme, base, components, utilities;
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities) important;
+/* These class names are our own components (.table, .grow); do not let Tailwind generate
+   same-named !important utilities that would override them (e.g. phone tables must scroll). */
+@source not inline("table grow");
 
 @theme {
   --breakpoint-xs: 480px;
@@ -175,6 +178,9 @@ html, body, #root {
     flex: 1 1 auto; min-width: min(100%, 140px); justify-content: center;
   }
   .page-head > .btn { width: 100%; }
+  /* "Updated … · Refresh" stays on one line, with a finger-sized button */
+  .page-head .period-select { width: 100%; }
+  .page-head .refresh-btn { min-height: 32px; padding: 4px 12px; }
 
   .toolbar {
     flex-direction: column;
