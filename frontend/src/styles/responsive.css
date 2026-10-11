@@ -332,3 +332,32 @@ html, body, #root {
   .page { padding-bottom: 20px; }
   .overlay { padding: 8px; align-items: flex-start; }
 }
+
+/* Hamburger: a bigger, easier tap target on tablets and phones (beats the smaller .topbar .icon-btn sizes above) */
+.topbar .icon-btn.nav-toggle {
+  width: 40px; height: 40px; flex: none; margin-left: -4px;
+  color: var(--text); border-radius: 8px;
+}
+.topbar .icon-btn.nav-toggle:active { background: var(--surface-2); }
+@media (max-width: 480px) {
+  .topbar .icon-btn.nav-toggle { width: 38px; height: 38px; }
+}
+
+/* Settings menu: a sticky side list on desktop; one sideways-scrolling row on tablets and phones */
+.settings-card { position: sticky; top: 0; }
+@media (max-width: 860px) {
+  .settings-card { position: static; }
+  .settings-card .card-head { display: none; }
+  .settings-nav {
+    display: flex; flex-wrap: nowrap; gap: 6px; padding: 8px;
+    max-height: none; overflow-x: auto; overflow-y: hidden;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+  }
+  .settings-nav::-webkit-scrollbar { display: none; }
+  .settings-nav a {
+    flex: none; white-space: nowrap; padding: 7px 12px; border-radius: 999px;
+    border: 1px solid var(--border); scroll-snap-align: start;
+  }
+  .settings-nav a.active { box-shadow: none; border-color: var(--primary); }
+}

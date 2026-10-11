@@ -52,6 +52,8 @@ would override it. Our `.table` and `.grow` are excluded with `@source not inlin
 
 Every screen is checked for horizontal overflow at 320, 375, 768, 1024 and 1440 px (small phone to desktop):
 tables scroll inside their own box, and page headers, dropdowns and modals stay within the screen.
+Below 960 px the sidebar becomes a drawer opened by a large (40 px) menu button, and below 860 px the Settings
+menu turns into one row of buttons you swipe sideways, scrolled to the current page.
 
 ## 1. Database
 Create an empty PostgreSQL database (PostgreSQL 13+):

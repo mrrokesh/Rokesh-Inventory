@@ -338,7 +338,7 @@ export default function Layout({ children }: any) {
         )}
         <header className="topbar no-print">
           <button type="button" className="icon-btn nav-toggle" onClick={() => setNavOpen((o) => !o)} aria-label="Open menu" aria-expanded={navOpen}>
-            <Icon name="menu" />
+            <Icon name="menu" size={22} className="" />
           </button>
           <GlobalSearch />
           <div className="spacer" />

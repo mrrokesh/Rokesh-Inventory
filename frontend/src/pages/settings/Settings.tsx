@@ -1,5 +1,5 @@
 ﻿import { useEffect, useRef, useState } from 'react';
-import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
+import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { api, mediaUrl } from '@/api/client';
 import { useAuth } from '@/auth';
 import { invalidateLookups } from '@/lib/lookups';
@@ -578,12 +578,20 @@ function AnnouncementsAdmin() {
 
 export default function Settings() {
   const { can } = useAuth();
+  const { pathname } = useLocation();
+  const navRef = useRef(null);
+  // On phones the links are one sideways-scrolling row: keep the current page's link in view.
+  useEffect(() => {
+    const nav = navRef.current;
+    const a = nav?.querySelector('a.active');
+    if (nav && a && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = a.offsetLeft - (nav.clientWidth - a.offsetWidth) / 2;
+  }, [pathname]);
   return (
     <div className="page">
       <div className="grid-2" style={{ gridTemplateColumns: '220px minmax(0, 1fr)', alignItems: 'start' }}>
-        <div className="card" style={{ position: 'sticky', top: 0 }}>
+        <div className="card settings-card">
           <div className="card-head"><h3>Settings</h3></div>
-          <div className="settings-nav">
+          <div className="settings-nav" ref={navRef}>
             {LINKS.filter(([, , perm]) => !perm || can(perm)).map(([to, text]) => (
               <NavLink key={to} to={`/settings/${to}`} className={({ isActive }) => (isActive ? 'active' : '')}>{text}</NavLink>
             ))}
