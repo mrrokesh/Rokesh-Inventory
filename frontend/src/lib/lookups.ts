@@ -1,5 +1,5 @@
 ﻿import { useEffect, useState } from 'react';
-import { api } from '../api';
+import { api } from '@/api';
 
 // Small cache for settings lists used across many forms.
 const cache: Record<string, Promise<any>> = {};

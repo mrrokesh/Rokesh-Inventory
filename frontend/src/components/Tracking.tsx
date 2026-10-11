@@ -2,9 +2,9 @@
 // direction 'in'  → type new serial numbers / batch numbers
 // direction 'out' → choose from what is in stock (or leave empty to pick automatically)
 import { useEffect, useState } from 'react';
-import { api } from '../api';
-import { date, qty as fmtQty } from '../lib/format';
-import { Modal } from './ui';
+import { api } from '@/api';
+import { date, qty as fmtQty } from '@/lib/format';
+import { Modal } from '@/components/ui';
 
 const parseSerials = (text) => [...new Set(String(text || '').split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean))];
 

@@ -1,10 +1,10 @@
 ﻿import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '../api';
-import { useAuth } from '../auth';
-import { dateTime } from '../lib/format';
-import { Checkbox, ErrorBox, Field, Input, Modal, Textarea, confirmDialog, useAction, useApi } from './ui';
-import { useToast } from './Toast';
+import { api } from '@/api';
+import { useAuth } from '@/auth';
+import { dateTime } from '@/lib/format';
+import { Checkbox, ErrorBox, Field, Input, Modal, Textarea, confirmDialog, useAction, useApi } from '@/components/ui';
+import { useToast } from '@/components/Toast';
 
 /** Email a document to the customer/vendor. */
 export function EmailModal({ entityType, entityId, onClose, onSent }: any) {

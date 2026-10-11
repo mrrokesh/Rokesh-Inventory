@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link, Navigate, NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom';
-import { APP_NAME, LOGO_SRC } from '../../brand';
-import { Badge, ErrorBox, Field, Input, PageHead, Select, Spinner, Textarea, useAction } from '../../components/ui';
-import { useToast } from '../../components/Toast';
-import { dateTime } from '../../lib/format';
-import { setToken } from '../../api';
-import { getPlatformToken, platformApi, setPlatformToken, setPlatformUnauthorizedHandler } from '../../platformApi';
+import { APP_NAME, LOGO_SRC } from '@/config/brand';
+import { Badge, ErrorBox, Field, Input, PageHead, Select, Spinner, Textarea, useAction } from '@/components/ui';
+import { useToast } from '@/components/Toast';
+import { dateTime } from '@/lib/format';
+import { setToken } from '@/api';
+import { getPlatformToken, platformApi, setPlatformToken, setPlatformUnauthorizedHandler } from '@/api/platform';
 
 type Admin = { id: number; name: string; email: string };
 

@@ -1,5 +1,5 @@
-import { useLookups } from '../lib/lookups';
-import { Field, Select } from './ui';
+import { useLookups } from '@/lib/lookups';
+import { Field, Select } from '@/components/ui';
 
 /** Active reporting tags used on a document type (invoice, bill, ...). */
 export function useReportingTags(module) {

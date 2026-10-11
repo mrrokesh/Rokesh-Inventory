@@ -1,19 +1,19 @@
 ﻿import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { api, mediaUrl } from '../../api';
-import { useAuth } from '../../auth';
-import { useLookups } from '../../lib/lookups';
-import { addressLines, baseCurrency, date, label, modeLabel, money, qty, PAYMENT_TERMS } from '../../lib/format';
-import { Badge, Dropdown, ErrorBox, PageHead, Spinner, confirmDialog, useAction, useApi } from '../../components/ui';
-import { Attachments, History } from '../../components/Attachments';
-import { useToast } from '../../components/Toast';
-import Icon from '../../components/Icon';
-import { ApplyCreditModal, PackageModal, ReceiveModal, RecordPaymentModal, RefundModal, ReturnModal } from './Modals';
-import { CHALLAN_TYPES } from './config';
-import { Comments, EmailModal } from '../../components/Comms';
-import SmsModal from '../../components/SmsModal';
-import { CustomFieldValues } from '../../components/CustomFields';
-import { TagValues } from '../../components/ReportingTags';
+import { api, mediaUrl } from '@/api';
+import { useAuth } from '@/auth';
+import { useLookups } from '@/lib/lookups';
+import { addressLines, baseCurrency, date, label, modeLabel, money, qty, PAYMENT_TERMS } from '@/lib/format';
+import { Badge, Dropdown, ErrorBox, PageHead, Spinner, confirmDialog, useAction, useApi } from '@/components/ui';
+import { Attachments, History } from '@/components/Attachments';
+import { useToast } from '@/components/Toast';
+import Icon from '@/components/Icon';
+import { ApplyCreditModal, PackageModal, ReceiveModal, RecordPaymentModal, RefundModal, ReturnModal } from '@/pages/docs/Modals';
+import { CHALLAN_TYPES } from '@/pages/docs/config';
+import { Comments, EmailModal } from '@/components/Comms';
+import SmsModal from '@/components/SmsModal';
+import { CustomFieldValues } from '@/components/CustomFields';
+import { TagValues } from '@/components/ReportingTags';
 
 const EMAILABLE = ['estimates', 'sales_orders', 'invoices', 'retainers', 'credit_notes', 'delivery_challans', 'purchase_orders', 'vendor_credits'];
 

@@ -14,7 +14,10 @@
     "strict": false,
     "noImplicitAny": false,
     "strictNullChecks": false,
-    "useUnknownInCatchVariables": false
+    "useUnknownInCatchVariables": false,
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   },
   "include": ["src"]
 }

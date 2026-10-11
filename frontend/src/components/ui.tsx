@@ -1,8 +1,8 @@
 ﻿import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '../api';
-import { label } from '../lib/format';
-import Icon from './Icon';
+import { api } from '@/api';
+import { label } from '@/lib/format';
+import Icon from '@/components/Icon';
 
 /** Load data on mount / when deps change. Returns { data, error, loading, reload, setData }. */
 export function useApi(path: any, params?: any, deps: any[] = [], _extra?: any): any {
@@ -167,9 +167,16 @@ export function Dropdown({ button, children, left, menuClass }: any) {
     return () => document.removeEventListener('mousedown', onDoc);
   }, [open]);
   return (
-    <div className="menu-wrap" ref={ref}>
+    <div className="menu-wrap relative" ref={ref}>
       {button(() => setOpen((o) => !o), open)}
-      {open && <div className={`menu ${left ? 'left' : ''} ${menuClass || ''}`} onClick={() => setOpen(false)}>{children}</div>}
+      {open && (
+        <div
+          className={`menu max-w-[calc(100vw-16px)] ${left ? 'left' : ''} ${menuClass || ''}`}
+          onClick={() => setOpen(false)}
+        >
+          {children}
+        </div>
+      )}
     </div>
   );
 }
@@ -178,9 +185,9 @@ export function PageHead({ title, crumb, children }: any) {
   return (
     <>
       {crumb && <div className="breadcrumb">{crumb}</div>}
-      <div className="page-head">
-        <h1>{title}</h1>
-        <div className="btn-group">{children}</div>
+      <div className="page-head flex flex-col items-stretch gap-2.5 sm:flex-row sm:items-center sm:gap-3">
+        <h1 className="min-w-0 break-words sm:mr-auto">{title}</h1>
+        {children ? <div className="btn-group flex w-full flex-wrap gap-2 sm:w-auto">{children}</div> : null}
       </div>
     </>
   );

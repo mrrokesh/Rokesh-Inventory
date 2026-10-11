@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
-import { date } from '../lib/format';
-import { useLookups } from '../lib/lookups';
-import { Checkbox, Field, FormRow, Input, Select, Textarea } from './ui';
+import { date } from '@/lib/format';
+import { useLookups } from '@/lib/lookups';
+import { Checkbox, Field, FormRow, Input, Select, Textarea } from '@/components/ui';
 
 /** Active custom field definitions for a record type (item, customer, invoice, ...). */
 export function useCustomFields(entity) {

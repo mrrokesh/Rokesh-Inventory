@@ -1,10 +1,10 @@
 ﻿import { Link } from 'react-router-dom';
-import { api, mediaUrl } from '../../api';
-import { useAuth } from '../../auth';
-import { money, qty } from '../../lib/format';
-import DataTable from '../../components/DataTable';
-import { Badge, PageHead, confirmDialog } from '../../components/ui';
-import { useToast } from '../../components/Toast';
+import { api, mediaUrl } from '@/api';
+import { useAuth } from '@/auth';
+import { money, qty } from '@/lib/format';
+import DataTable from '@/components/DataTable';
+import { Badge, PageHead, confirmDialog } from '@/components/ui';
+import { useToast } from '@/components/Toast';
 
 export function stockBadge(it) {
   if (!it.track_inventory) return <span className="faint small">Not tracked</span>;

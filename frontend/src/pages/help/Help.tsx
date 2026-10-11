@@ -1,8 +1,8 @@
 ﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { renderMarkdown } from '../../lib/markdown';
-import { EmptyState } from '../../components/ui';
-import { ARTICLES, ARTICLE_MAP } from './index';
+import { renderMarkdown } from '@/lib/markdown';
+import { EmptyState } from '@/components/ui';
+import { ARTICLES, ARTICLE_MAP } from '@/pages/help';
 
 const GROUPS = [...new Set(ARTICLES.map((a) => a.group))];
 

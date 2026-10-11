@@ -1,10 +1,10 @@
 ﻿import { useRef, useState } from 'react';
-import { api, documentUrl } from '../api';
-import { useAuth } from '../auth';
-import { dateTime, fileSize } from '../lib/format';
-import { confirmDialog, useApi } from './ui';
-import { useToast } from './Toast';
-import Icon from './Icon';
+import { api, documentUrl } from '@/api';
+import { useAuth } from '@/auth';
+import { dateTime, fileSize } from '@/lib/format';
+import { confirmDialog, useApi } from '@/components/ui';
+import { useToast } from '@/components/Toast';
+import Icon from '@/components/Icon';
 
 /** Files attached to a record. */
 export function Attachments({ entityType, entityId }: any) {

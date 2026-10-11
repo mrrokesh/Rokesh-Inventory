@@ -1,16 +1,16 @@
 ﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { api } from '../../api';
-import { useLookups } from '../../lib/lookups';
-import { baseCurrency, money, qty, today, PAYMENT_TERMS, INDIAN_STATES } from '../../lib/format';
-import { TrackingButton, TrackingModal } from '../../components/Tracking';
-import { useAuth } from '../../auth';
-import { ContactPicker, ItemPicker } from '../../components/Pickers';
-import { BackLink, Checkbox, ErrorBox, Field, Input, PageHead, Select, Spinner, Textarea } from '../../components/ui';
-import { useToast } from '../../components/Toast';
-import { CustomFieldInputs } from '../../components/CustomFields';
-import { TagInputs } from '../../components/ReportingTags';
-import { BILL_ACCOUNTS, computeTotals } from './config';
+import { api } from '@/api';
+import { useLookups } from '@/lib/lookups';
+import { baseCurrency, money, qty, today, PAYMENT_TERMS, INDIAN_STATES } from '@/lib/format';
+import { TrackingButton, TrackingModal } from '@/components/Tracking';
+import { useAuth } from '@/auth';
+import { ContactPicker, ItemPicker } from '@/components/Pickers';
+import { BackLink, Checkbox, ErrorBox, Field, Input, PageHead, Select, Spinner, Textarea } from '@/components/ui';
+import { useToast } from '@/components/Toast';
+import { CustomFieldInputs } from '@/components/CustomFields';
+import { TagInputs } from '@/components/ReportingTags';
+import { BILL_ACCOUNTS, computeTotals } from '@/pages/docs/config';
 
 let lineSeq = 0;
 const newLine = (over: any = {}) => ({ _k: ++lineSeq, item_id: null, item_name: '', description: '', quantity: 1, rate: '', discount_percent: 0, tax_id: '', account: '', available: null, track: false, unit: '', tmode: 'none', tracking: null, ...over });

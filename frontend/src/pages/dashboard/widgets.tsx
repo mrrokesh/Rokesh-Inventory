@@ -3,9 +3,9 @@
 // and offers only the sizes where extra space adds real information.
 import { Link } from 'react-router-dom';
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { date, dateTime, label, money, qty } from '../../lib/format';
-import { isDark } from '../../lib/theme';
-import Icon from '../../components/Icon';
+import { date, dateTime, label, money, qty } from '@/lib/format';
+import { isDark } from '@/lib/theme';
+import Icon from '@/components/Icon';
 
 const compact = (v) => {
   const n = Number(v) || 0;

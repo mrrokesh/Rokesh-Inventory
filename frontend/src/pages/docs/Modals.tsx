@@ -1,10 +1,10 @@
 ﻿import { useEffect, useState } from 'react';
-import { api } from '../../api';
-import { useLookups } from '../../lib/lookups';
-import { date, money, qty, today, PAYMENT_MODES } from '../../lib/format';
-import { Checkbox, Field, Input, Modal, Select, Textarea, useAction } from '../../components/ui';
-import { useToast } from '../../components/Toast';
-import { TrackingButton, TrackingModal } from '../../components/Tracking';
+import { api } from '@/api';
+import { useLookups } from '@/lib/lookups';
+import { date, money, qty, today, PAYMENT_MODES } from '@/lib/format';
+import { Checkbox, Field, Input, Modal, Select, Textarea, useAction } from '@/components/ui';
+import { useToast } from '@/components/Toast';
+import { TrackingButton, TrackingModal } from '@/components/Tracking';
 
 /** Per-line serial/batch state for the quantity dialogs. */
 function useLineTracking() {

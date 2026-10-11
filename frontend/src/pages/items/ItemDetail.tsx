@@ -1,14 +1,14 @@
 ﻿import { useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { api, mediaUrl } from '../../api';
-import { useAuth } from '../../auth';
-import { useLookups } from '../../lib/lookups';
-import { date, dateTime, label, money, qty, today } from '../../lib/format';
-import { Badge, Dropdown, ErrorBox, Modal, PageHead, Spinner, Tabs, confirmDialog, useAction, useApi } from '../../components/ui';
-import { Attachments, History } from '../../components/Attachments';
-import { useToast } from '../../components/Toast';
-import { stockBadge } from './ItemsList';
-import { CustomFieldValues } from '../../components/CustomFields';
+import { api, mediaUrl } from '@/api';
+import { useAuth } from '@/auth';
+import { useLookups } from '@/lib/lookups';
+import { date, dateTime, label, money, qty, today } from '@/lib/format';
+import { Badge, Dropdown, ErrorBox, Modal, PageHead, Spinner, Tabs, confirmDialog, useAction, useApi } from '@/components/ui';
+import { Attachments, History } from '@/components/Attachments';
+import { useToast } from '@/components/Toast';
+import { stockBadge } from '@/pages/items/ItemsList';
+import { CustomFieldValues } from '@/components/CustomFields';
 
 const SOURCE_LINKS = {
   shipment: (id) => `/shipments/${id}`, invoice: (id) => `/invoices/${id}`, purchase_receive: (id) => `/purchase-receives/${id}`,

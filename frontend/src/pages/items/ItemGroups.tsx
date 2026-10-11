@@ -1,12 +1,12 @@
 ﻿import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { api } from '../../api';
-import { useAuth } from '../../auth';
-import { useLookups } from '../../lib/lookups';
-import { money, qty } from '../../lib/format';
-import DataTable from '../../components/DataTable';
-import { BackLink, Badge, ErrorBox, Field, FormRow, Input, Modal, PageHead, Spinner, Textarea, confirmDialog, useAction, useApi } from '../../components/ui';
-import { useToast } from '../../components/Toast';
+import { api } from '@/api';
+import { useAuth } from '@/auth';
+import { useLookups } from '@/lib/lookups';
+import { money, qty } from '@/lib/format';
+import DataTable from '@/components/DataTable';
+import { BackLink, Badge, ErrorBox, Field, FormRow, Input, Modal, PageHead, Spinner, Textarea, confirmDialog, useAction, useApi } from '@/components/ui';
+import { useToast } from '@/components/Toast';
 
 export function ItemGroupsList() {
   const { can } = useAuth();

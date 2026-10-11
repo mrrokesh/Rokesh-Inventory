@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { api } from '../api';
-import { useToast } from './Toast';
-import { Field, Input, Modal, Textarea, useAction } from './ui';
+import { api } from '@/api';
+import { useToast } from '@/components/Toast';
+import { Field, Input, Modal, Textarea, useAction } from '@/components/ui';
 
 /** "Send SMS" from a document: pre-fills the contact's mobile number and a short message. */
 export default function SmsModal({ entityType, entityId, contactApi, contactId, message, onClose }: any) {

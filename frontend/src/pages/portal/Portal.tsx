@@ -1,11 +1,11 @@
 ﻿// Customer & vendor portal — what a customer or vendor sees at /portal/<org-slug>.
 import { useCallback, useEffect, useState } from 'react';
 import { Link, NavLink, Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
-import { addressLines, date, dateTime, label, modeLabel, money, qty, INDIAN_STATES } from '../../lib/format';
-import { Badge, EmptyState, ErrorBox, Field, Input, Select, Spinner, Textarea } from '../../components/ui';
-import { API_BASE, mediaUrl } from '../../api';
-import { APP_NAME, LOGO_SRC } from '../../brand';
-import { useToast } from '../../components/Toast';
+import { addressLines, date, dateTime, label, modeLabel, money, qty, INDIAN_STATES } from '@/lib/format';
+import { Badge, EmptyState, ErrorBox, Field, Input, Select, Spinner, Textarea } from '@/components/ui';
+import { API_BASE, mediaUrl } from '@/api';
+import { APP_NAME, LOGO_SRC } from '@/config/brand';
+import { useToast } from '@/components/Toast';
 
 const KEY = (slug) => `inv_portal_${slug}`;
 const getTok = (slug) => { try { return localStorage.getItem(KEY(slug)) || ''; } catch { return ''; } };

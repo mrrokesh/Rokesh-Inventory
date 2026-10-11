@@ -1,14 +1,14 @@
 ﻿import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { api } from '../api';
-import { useAuth } from '../auth';
-import { label } from '../lib/format';
-import { applyBrandColor, getTheme, setTheme } from '../lib/theme';
-import { useLookups } from '../lib/lookups';
-import { helpSlugFor } from '../pages/help/index';
-import { APP_NAME, LOGO_SRC } from '../brand';
-import Icon from './Icon';
-import { ConfirmHost, Dropdown, useDebounced } from './ui';
+import { api } from '@/api';
+import { useAuth } from '@/auth';
+import { label } from '@/lib/format';
+import { applyBrandColor, getTheme, setTheme } from '@/lib/theme';
+import { useLookups } from '@/lib/lookups';
+import { helpSlugFor } from '@/pages/help';
+import { APP_NAME, LOGO_SRC } from '@/config/brand';
+import Icon from '@/components/Icon';
+import { ConfirmHost, Dropdown, useDebounced } from '@/components/ui';
 
 export const NAV = [
   { key: 'home', label: 'Home', icon: 'home', to: '/' },

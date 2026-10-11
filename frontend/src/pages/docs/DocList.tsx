@@ -1,13 +1,13 @@
 ﻿import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '../../api';
-import { useToast } from '../../components/Toast';
-import { useAction } from '../../components/ui';
-import { useAuth } from '../../auth';
-import { date, money } from '../../lib/format';
-import DataTable from '../../components/DataTable';
-import { Badge, PageHead } from '../../components/ui';
-import { useReportingTags } from '../../components/ReportingTags';
+import { api } from '@/api';
+import { useToast } from '@/components/Toast';
+import { useAction } from '@/components/ui';
+import { useAuth } from '@/auth';
+import { date, money } from '@/lib/format';
+import DataTable from '@/components/DataTable';
+import { Badge, PageHead } from '@/components/ui';
+import { useReportingTags } from '@/components/ReportingTags';
 
 export default function DocList({ cfg }: any) {
   const { can, user } = useAuth();

@@ -293,7 +293,7 @@ async function runAction(a, ctx) {
     const subject = fillPlaceholders(a.subject, ctx);
     let bodyHtml = '';
     if (a.include_document && m.kind === 'doc') {
-      const { EMAILABLE, documentHtml, documentExtras } = await import('../routes/email.js');
+      const { EMAILABLE, documentHtml, documentExtras } = await import('../routes/settings/email.js');
       const { fetchDoc } = await import('./documents.js');
       const cfg = EMAILABLE[module];
       if (cfg) {

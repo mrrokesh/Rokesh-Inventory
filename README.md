@@ -7,6 +7,45 @@ Built as a **multi-tenant SaaS**: each client is an organization on a shared dat
 - `backend/` – Node.js + TypeScript + Express + PostgreSQL API
 - `frontend/` – React + TypeScript + Vite single-page app (routes load on demand)
 
+## Project structure
+
+```
+backend/src/
+  server.ts, config.ts, db.ts, migrate.ts
+  migrations/        numbered .sql files, applied automatically on start
+  middleware/        auth (login token, permissions)
+  lib/               shared business logic: stock (FIFO), documents, GST, numbering, mailer, workflows…
+  routes/
+    auth/            sign up, login, users
+    catalog/         items, item groups, price lists, customers & vendors
+    sales/           estimates, sales orders, invoices, retainers, credit notes, challans
+    purchases/       purchase orders, bills, vendor credits, payments, landed costs
+    inventory/       adjustments, transfers, stock counts, assemblies, picklists, tasks
+    documents/       shared document router, attachments, comments
+    reports/         reports, custom reports, schedules, dashboard
+    settings/        settings, currencies, email, integrations, notifications, workflows
+    modules/         custom modules and public web forms
+    platform/        Super Admin console and customer portal
+  types/             Express request typings
+
+frontend/src/
+  app/               main.tsx (entry) and App.tsx (routes)
+  api/               API client (import from '@/api')
+  auth/              login state (import from '@/auth')
+  config/            brand name and constants
+  components/        shared UI: Layout, tables, pickers, modals, icons
+  lib/               formatting, lookups, theme, markdown
+  pages/<area>/      one folder per area: items, contacts, docs, inventory, reports, settings, portal…
+  styles/            styles.css (main stylesheet) and responsive.css (Tailwind utilities + phone/tablet rules)
+  types/             shared TypeScript types
+
+docs/user-guide/     help articles, also shown in the app's Help Center
+```
+
+Imports in the frontend use the `@/` alias for `src/` (for example `import { api } from '@/api'`).
+Styling is plain CSS with CSS variables for light/dark themes. Tailwind v4 utilities are available
+(without its CSS reset), so new code can use utility classes next to the existing ones.
+
 ## 1. Database
 Create an empty PostgreSQL database (PostgreSQL 13+):
 

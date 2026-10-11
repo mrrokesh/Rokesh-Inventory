@@ -1,13 +1,13 @@
 ﻿import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { api } from '../../api';
-import { useLookups } from '../../lib/lookups';
-import { money, today } from '../../lib/format';
-import { ContactPicker, ItemPicker } from '../../components/Pickers';
-import { BackLink, Checkbox, ErrorBox, FormRow, Input, PageHead, Select, Spinner, Textarea, useApi } from '../../components/ui';
-import { useToast } from '../../components/Toast';
-import { TrackingButton, TrackingModal } from '../../components/Tracking';
-import { CustomFieldInputs } from '../../components/CustomFields';
+import { api } from '@/api';
+import { useLookups } from '@/lib/lookups';
+import { money, today } from '@/lib/format';
+import { ContactPicker, ItemPicker } from '@/components/Pickers';
+import { BackLink, Checkbox, ErrorBox, FormRow, Input, PageHead, Select, Spinner, Textarea, useApi } from '@/components/ui';
+import { useToast } from '@/components/Toast';
+import { TrackingButton, TrackingModal } from '@/components/Tracking';
+import { CustomFieldInputs } from '@/components/CustomFields';
 
 const EMPTY = {
   name: '', sku: '', barcode: '', item_type: 'goods', unit: 'pcs', category: '', brand: '', manufacturer: '', description: '', hsn_sac: '',

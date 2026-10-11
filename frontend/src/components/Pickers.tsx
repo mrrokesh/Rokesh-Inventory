@@ -1,7 +1,7 @@
 ﻿import { useEffect, useRef, useState } from 'react';
-import { api } from '../api';
-import { money, qty } from '../lib/format';
-import { useDebounced } from './ui';
+import { api } from '@/api';
+import { money, qty } from '@/lib/format';
+import { useDebounced } from '@/components/ui';
 
 /**
  * Searchable remote combobox.

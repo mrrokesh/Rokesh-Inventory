@@ -1,10 +1,10 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { api, fetchAll } from '../api';
-import { downloadXlsx } from '../lib/format';
-import { EmptyState, ErrorBox, Spinner, useDebounced } from './ui';
-import { useToast } from './Toast';
-import Icon from './Icon';
+import { api, fetchAll } from '@/api';
+import { downloadXlsx } from '@/lib/format';
+import { EmptyState, ErrorBox, Spinner, useDebounced } from '@/components/ui';
+import { useToast } from '@/components/Toast';
+import Icon from '@/components/Icon';
 
 /**
  * Server-paginated table with search, filters, sorting, selection, bulk actions and Excel export.
@@ -92,24 +92,24 @@ export default function DataTable({
 
   const hasBulk = bulkActions.length > 0;
   return (
-    <div className="card">
-      <div className="toolbar">
-        <input type="search" className="input" placeholder={searchPlaceholder} value={search} onChange={(e) => setSearch(e.target.value)} style={{ width: 260 }} />
+    <div className="card overflow-hidden">
+      <div className="toolbar flex flex-col items-stretch gap-2 md:flex-row md:flex-wrap md:items-center">
+        <input type="search" className="input w-full min-w-0 md:w-[260px] md:max-w-full" placeholder={searchPlaceholder} value={search} onChange={(e) => setSearch(e.target.value)} />
         {filters.map((f) => (
-          <select key={f.key} className="input" style={{ width: 'auto' }} value={filterValues[f.key]} onChange={(e) => setParam(f.key, e.target.value, !!f.default)} aria-label={f.label}>
+          <select key={f.key} className="input w-full min-w-0 md:w-auto" value={filterValues[f.key]} onChange={(e) => setParam(f.key, e.target.value, !!f.default)} aria-label={f.label}>
             {f.options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
         ))}
-        <div className="spacer" />
+        <div className="spacer hidden md:block" />
         {toolbarExtra}
         {exportName && (
-          <button type="button" className="btn sm" onClick={doExport} disabled={exporting}>
+          <button type="button" className="btn sm w-full md:w-auto" onClick={doExport} disabled={exporting}>
             <Icon name="download" size={14} className="" /> {exporting ? 'Exporting…' : 'Export Excel'}
           </button>
         )}
       </div>
       {hasBulk && selected.size > 0 && (
-        <div className="bulkbar">
+        <div className="bulkbar flex flex-wrap gap-2">
           <strong>{selected.size} selected</strong>
           {bulkActions.map((a) => (
             <button type="button" key={a.label} className={`btn sm ${a.danger ? 'danger' : ''}`} onClick={() => runBulk(a)}>{a.label}</button>
@@ -118,7 +118,7 @@ export default function DataTable({
         </div>
       )}
       <ErrorBox error={state.error} />
-      <div className="table-wrap">
+      <div className="table-wrap max-w-full overflow-x-auto">
         <table className="table">
           <thead>
             <tr>
@@ -146,8 +146,8 @@ export default function DataTable({
         <EmptyState title={debounced || Object.values(filterValues).some(Boolean) ? 'No matching records' : emptyTitle} text={emptyText} action={emptyAction} />
       )}
       {state.total > perPage && (
-        <div className="pager">
-          <span>{(page - 1) * perPage + 1}–{Math.min(page * perPage, state.total)} of {state.total}</span>
+        <div className="pager flex flex-wrap items-center justify-center gap-2 md:justify-end">
+          <span className="text-center">{(page - 1) * perPage + 1}–{Math.min(page * perPage, state.total)} of {state.total}</span>
           <button type="button" className="btn sm" disabled={page <= 1} onClick={() => setParam('page', page - 1)}>Prev</button>
           <span>Page {page} / {pages}</span>
           <button type="button" className="btn sm" disabled={page >= pages} onClick={() => setParam('page', page + 1)}>Next</button>
