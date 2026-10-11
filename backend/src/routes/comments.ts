@@ -4,9 +4,16 @@ import { query } from '../db.js';
 import { audit } from '../lib/audit.js';
 import { badRequest, forbidden, notFound } from '../lib/errors.js';
 import { str, bool } from '../lib/validate.js';
+import { notifyMentions } from '../lib/notify.js';
 
 const r = Router();
-const TYPES = ['estimate', 'sales_order', 'invoice', 'credit_note', 'delivery_challan', 'purchase_order', 'bill', 'vendor_credit', 'customer', 'vendor', 'item'];
+const TYPES = ['estimate', 'sales_order', 'invoice', 'retainer', 'credit_note', 'delivery_challan', 'purchase_order', 'bill', 'vendor_credit', 'customer', 'vendor', 'item'];
+const LINKS = {
+  estimate: (id) => `/estimates/${id}`, sales_order: (id) => `/sales-orders/${id}`, invoice: (id) => `/invoices/${id}`,
+  retainer: (id) => `/retainers/${id}`, credit_note: (id) => `/credit-notes/${id}`, delivery_challan: (id) => `/delivery-challans/${id}`,
+  purchase_order: (id) => `/purchase-orders/${id}`, bill: (id) => `/bills/${id}`, vendor_credit: (id) => `/vendor-credits/${id}`,
+  customer: (id) => `/customers/${id}`, vendor: (id) => `/vendors/${id}`, item: (id) => `/items/${id}`,
+};
 
 r.get('/', async (req, res) => {
   const type = String(req.query.entity_type || '');
@@ -30,6 +37,11 @@ r.post('/', async (req, res) => {
     [req.orgId, b.entity_type, Number(b.entity_id), req.user.id, body, internal],
   );
   await audit({ query }, req, 'comment', b.entity_type, Number(b.entity_id), `${internal ? 'Internal note' : 'Comment'}: "${body.slice(0, 80)}"`);
+  const link = LINKS[b.entity_type]?.(Number(b.entity_id)) || null;
+  await notifyMentions({ query }, {
+    orgId: req.orgId, fromUserId: req.user.id, fromName: req.user.name, body,
+    entityType: b.entity_type, entityId: Number(b.entity_id), link,
+  });
   res.status(201).json({ id: c.id });
 });
 

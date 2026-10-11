@@ -19,6 +19,7 @@ export const EMAILABLE = {
   estimate: { table: 'estimates', linesTable: 'estimate_lines', label: 'Estimate', module: 'estimates' },
   sales_order: { table: 'sales_orders', linesTable: 'sales_order_lines', label: 'Sales Order', module: 'sales_orders' },
   invoice: { table: 'invoices', linesTable: 'invoice_lines', label: 'Invoice', module: 'invoices' },
+  retainer: { table: 'retainers', linesTable: 'retainer_lines', label: 'Retainer Invoice', module: 'retainers' },
   credit_note: { table: 'credit_notes', linesTable: 'credit_note_lines', label: 'Credit Note', module: 'sales_returns' },
   delivery_challan: { table: 'delivery_challans', linesTable: 'delivery_challan_lines', label: 'Delivery Challan', module: 'delivery_challans' },
   purchase_order: { table: 'purchase_orders', linesTable: 'purchase_order_lines', label: 'Purchase Order', module: 'purchase_orders' },
@@ -140,15 +141,64 @@ async function buildDocEmail(req, entityType, entityId) {
   return { cfg, doc, org, contact, button, extras };
 }
 
+// ------------------------------------------------------------------ email templates (Settings → Email templates)
+export const EMAIL_PLACEHOLDERS = ['contact_name', 'number', 'total', 'balance', 'due_date', 'date', 'reference', 'org_name', 'document'];
+
+/** The built-in subject and message, used until the organization saves its own. */
+export function defaultEmailTemplate(entityType) {
+  const label = EMAILABLE[entityType]?.label || 'Document';
+  return {
+    subject: `${label} {{number}} from {{org_name}}`,
+    body: `Dear {{contact_name}},\n\nPlease find ${label.toLowerCase()} {{number}} for {{total}} below.${entityType === 'invoice' ? '\nIt is due on {{due_date}}.' : ''}\n\nThank you for your business.\n{{org_name}}`,
+  };
+}
+
+function fillEmail(text, doc, org, cfg) {
+  const cur = doc.currency || org.currency;
+  const values = {
+    contact_name: doc.contact_name, number: doc.number, total: inr(doc.total, cur), balance: inr(doc.balance ?? doc.total, cur),
+    due_date: fmtDate(doc.due_date), date: fmtDate(doc.doc_date), reference: doc.reference || '', org_name: org.name, document: cfg.label,
+  };
+  return String(text || '').replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k) => (k in values ? String(values[k] ?? '') : m));
+}
+
+r.get('/templates', async (req, res) => {
+  const { rows } = await query('SELECT doc_type, subject, body, updated_at FROM email_templates WHERE org_id = $1', [req.orgId]);
+  const saved = Object.fromEntries(rows.map((x) => [x.doc_type, x]));
+  res.json({
+    placeholders: EMAIL_PLACEHOLDERS,
+    templates: Object.entries(EMAILABLE).map(([key, c]: any) => ({ doc_type: key, label: c.label, customised: !!saved[key], ...defaultEmailTemplate(key), ...(saved[key] || {}) })),
+  });
+});
+
+r.put('/templates/:docType', requireAdmin, async (req, res) => {
+  const dt = String(req.params.docType);
+  if (!EMAILABLE[dt]) throw badRequest('Unknown document type');
+  if (req.body?.reset) {
+    await query('DELETE FROM email_templates WHERE org_id = $1 AND doc_type = $2', [req.orgId, dt]);
+    return res.json({ doc_type: dt, ...defaultEmailTemplate(dt), customised: false });
+  }
+  const subject = str(req.body?.subject, { field: 'Subject', required: true, max: 200 });
+  const body = str(req.body?.body, { field: 'Message', required: true, max: 5000 });
+  await query(
+    `INSERT INTO email_templates (org_id, doc_type, subject, body) VALUES ($1, $2, $3, $4)
+     ON CONFLICT (org_id, doc_type) DO UPDATE SET subject = EXCLUDED.subject, body = EXCLUDED.body, updated_at = now()`,
+    [req.orgId, dt, subject, body],
+  );
+  await audit({ query }, req, 'update', 'email_template', null, `Email template for ${EMAILABLE[dt].label} updated`);
+  res.json({ doc_type: dt, subject, body, customised: true });
+});
+
 r.get('/compose/:entityType/:id', async (req, res) => {
   const { cfg, doc, org, contact } = await buildDocEmail(req, req.params.entityType, Number(req.params.id));
   const configured = !!(await smtpSettings(req.orgId));
+  const { rows: [tpl] } = await query('SELECT subject, body FROM email_templates WHERE org_id = $1 AND doc_type = $2', [req.orgId, String(req.params.entityType)]);
+  const t = tpl || defaultEmailTemplate(String(req.params.entityType));
   res.json({
     configured,
     to: contact.email || doc.contact_email || '',
-    subject: `${cfg.label} ${doc.number} from ${org.name}`,
-    message: `Dear ${doc.contact_name},\n\nPlease find ${cfg.label.toLowerCase()} ${doc.number} for ${inr(doc.total, doc.currency || org.currency)} below.${
-      doc.due_date && cfg.table === 'invoices' ? `\nIt is due on ${fmtDate(doc.due_date)}.` : ''}\n\nThank you for your business.\n${org.name}`,
+    subject: fillEmail(t.subject, doc, org, cfg),
+    message: fillEmail(t.body, doc, org, cfg),
   });
 });
 

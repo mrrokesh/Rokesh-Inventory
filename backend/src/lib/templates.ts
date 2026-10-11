@@ -1,5 +1,5 @@
 // PDF / document template settings (Settings -> PDF Templates).
-export const TEMPLATE_DOC_TYPES = ['estimate', 'sales_order', 'delivery_challan', 'invoice', 'credit_note', 'purchase_order', 'bill', 'vendor_credit', 'package', 'payment_receipt'];
+export const TEMPLATE_DOC_TYPES = ['estimate', 'sales_order', 'delivery_challan', 'invoice', 'retainer', 'credit_note', 'purchase_order', 'bill', 'vendor_credit', 'package', 'payment_receipt'];
 
 export const DEFAULT_TEMPLATE = {
   layout: 'standard',          // standard | compact | modern

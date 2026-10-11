@@ -137,6 +137,11 @@ The same guides are built into the app under **Help & Guides**, and the **?** bu
 
 ## Also included
 - Estimates (quotes) → sales orders; delivery challans (on approval / job work) → invoices
+- Retainer invoices: take advance payments and apply them to later invoices
+- Configure features: turn whole modules on or off per organization (Settings → Features)
+- Email templates: your own subject and message per document type, with placeholders such as `{{contact_name}}` (Settings → Email templates)
+- Data backup: download all of your organization's data as one multi-sheet Excel workbook (Settings → Data backup)
+- Responsive layout tested on every screen at 320, 375, 768, 1024 and 1440 px (phones, tablets, laptops, desktops)
 - Stock counts, picklists, and tasks (warehouse ops)
 - Serial-number and batch/expiry tracking (FIFO serials, first-expiry-first-out batches, full unit history)
 - Customer portal at `/portal/<org-slug>` (invoices, orders, quotes, shipments, statement, comments, pay online)

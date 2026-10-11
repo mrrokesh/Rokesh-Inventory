@@ -133,17 +133,30 @@ export async function refreshPayable(client, kind, docId) {
     : 'SELECT COALESCE(SUM(amount),0) AS s FROM vendor_credit_applications WHERE bill_id = $1';
   const { rows: [p] } = await client.query(paidSql, [docId]);
   const { rows: [c] } = await client.query(creditSql, [docId]);
+  let retainers = 0;
+  if (isInvoice) {
+    const { rows: [r] } = await client.query('SELECT COALESCE(SUM(amount),0) AS s FROM retainer_applications WHERE invoice_id = $1', [docId]);
+    retainers = Number(r.s);
+  }
   const { rows: [d] } = await client.query(`SELECT total, status FROM ${table} WHERE id = $1`, [docId]);
   if (d.status === 'draft' || d.status === 'void') return;
   const paid = Number(p.s);
   const credited = Number(c.s);
-  const balance = round2(Number(d.total) - paid - credited);
+  const applied = paid + credited + retainers;
+  const balance = round2(Number(d.total) - applied);
   const openStatus = isInvoice ? 'sent' : 'open';
-  const status = balance <= 0.004 ? 'paid' : (paid + credited > 0 ? 'partially_paid' : openStatus);
-  await client.query(
-    `UPDATE ${table} SET amount_paid = $2, credits_applied = $3, balance = $4, status = $5, updated_at = now() WHERE id = $1`,
-    [docId, paid, credited, Math.max(0, balance), status],
-  );
+  const status = balance <= 0.004 ? 'paid' : (applied > 0 ? 'partially_paid' : openStatus);
+  if (isInvoice) {
+    await client.query(
+      `UPDATE invoices SET amount_paid = $2, credits_applied = $3, retainers_applied = $4, balance = $5, status = $6, updated_at = now() WHERE id = $1`,
+      [docId, paid, credited, retainers, Math.max(0, balance), status],
+    );
+  } else {
+    await client.query(
+      `UPDATE bills SET amount_paid = $2, credits_applied = $3, balance = $4, status = $5, updated_at = now() WHERE id = $1`,
+      [docId, paid, credited, Math.max(0, balance), status],
+    );
+  }
 }
 
 /** Recalculate remaining balance / status of a credit note or vendor credit. */

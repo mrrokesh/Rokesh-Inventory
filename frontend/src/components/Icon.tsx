@@ -33,6 +33,7 @@ const PATHS = {
   back: 'M19 12H5M12 19l-7-7 7-7',
   alert: 'M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z',
   money: 'M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6',
+  menu: 'M4 7h16M4 12h16M4 17h16',
 };
 
 export default function Icon({ name, size = 16, className = 'nav-icon', style }: any) {

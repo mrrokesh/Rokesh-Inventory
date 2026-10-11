@@ -369,15 +369,17 @@ export const invoices = createDocRouter({
     }
   },
   enrich: async (db, req, doc) => {
-    const [{ rows: payments }, { rows: credits }, { rows: [so] }] = await Promise.all([
+    const [{ rows: payments }, { rows: credits }, { rows: retainersApplied }, { rows: [so] }] = await Promise.all([
       db.query(`SELECT a.id, a.amount, p.id AS payment_id, p.number, p.payment_date, p.mode, p.reference
                   FROM payment_received_allocations a JOIN payments_received p ON p.id = a.payment_id WHERE a.invoice_id = $1 ORDER BY p.payment_date`, [doc.id]),
       db.query(`SELECT a.id, a.amount, a.applied_date, cn.id AS credit_note_id, cn.number
                   FROM credit_applications a JOIN credit_notes cn ON cn.id = a.credit_note_id WHERE a.invoice_id = $1 ORDER BY a.id`, [doc.id]),
+      db.query(`SELECT a.id, a.amount, a.applied_date, r.id AS retainer_id, r.number
+                  FROM retainer_applications a JOIN retainers r ON r.id = a.retainer_id WHERE a.invoice_id = $1 ORDER BY a.id`, [doc.id]),
       db.query('SELECT id, number FROM sales_orders WHERE id = $1', [doc.sales_order_id]),
     ]);
     doc.payments = payments;
-    doc.credits = credits;
+    doc.credits = [...credits, ...retainersApplied.map((x) => ({ ...x, credit_note_id: x.retainer_id, number: `Retainer ${x.number}` }))];
     doc.sales_order_number = so?.number || null;
     doc.display_status = ['sent', 'partially_paid'].includes(doc.status) && doc.due_date < today() ? 'overdue' : doc.status;
     const [{ rows: [dc] }, units] = await Promise.all([

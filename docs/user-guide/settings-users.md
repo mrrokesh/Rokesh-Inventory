@@ -87,6 +87,10 @@ To change what a role can do, go to **Settings → Roles & permissions**, press 
 
 > **Tip:** Give people the smallest role they need. Someone who only packs boxes doesn't need to see your profit report.
 
+## Back up your data
+
+Go to **Settings → Data backup** and press **Download backup (.xlsx)**. You get one Excel workbook with a sheet each for items, stock by warehouse, customers, vendors, warehouses, every sales and purchase document, invoice and bill lines, payments, adjustments, transfers and the full stock history. Attached files (images, PDFs) are not included. Only administrators can download a backup, and each download is recorded in the audit log.
+
 ## Your own profile
 
 Click your initials (top right) → **My profile** to change your name or password, and choose Light / Dark appearance.

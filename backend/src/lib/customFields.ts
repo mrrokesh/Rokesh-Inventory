@@ -10,6 +10,7 @@ export const CUSTOM_FIELD_ENTITIES: Record<string, string> = {
   sales_order: 'Sales orders',
   delivery_challan: 'Delivery challans',
   invoice: 'Invoices',
+  retainer: 'Retainer invoices',
   credit_note: 'Credit notes',
   purchase_order: 'Purchase orders',
   bill: 'Bills',

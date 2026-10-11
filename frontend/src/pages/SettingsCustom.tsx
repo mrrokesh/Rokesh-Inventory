@@ -376,3 +376,95 @@ export function CurrenciesSettings() {
     </>
   );
 }
+
+// ------------------------------------------------------------------ email templates
+export function EmailTemplatesSettings() {
+  const { user } = useAuth();
+  const toast = useToast();
+  const [busy, run] = useAction(toast);
+  const { data, reload } = useApi('/email/templates');
+  const [edit, setEdit] = useState(null);
+  if (!data) return <Spinner />;
+  const save = async (reset = false) => {
+    if (await run(() => api.put(`/email/templates/${edit.doc_type}`, reset ? { reset: true } : edit), reset ? 'Template reset to the default' : 'Email template saved')) { setEdit(null); reload(); }
+  };
+  return (
+    <>
+      <PageHead title="Email Templates" />
+      <p className="muted" style={{ marginTop: 0 }}>
+        The subject and message filled in when you press <b>Email</b> on a document. You can still change them before sending.
+        Use placeholders like <span className="mono">{'{{contact_name}}'}</span> and <span className="mono">{'{{number}}'}</span> — they are replaced with the document’s details.
+      </p>
+      <div className="card table-wrap"><table className="table">
+        <thead><tr><th>Document</th><th>Subject</th><th>Status</th>{user.is_admin && <th />}</tr></thead>
+        <tbody>
+          {data.templates.map((t) => (
+            <tr key={t.doc_type}>
+              <td className="bold">{t.label}</td>
+              <td className="small">{t.subject}</td>
+              <td><Badge status={t.customised ? 'active' : 'inactive'}>{t.customised ? 'Customised' : 'Default'}</Badge></td>
+              {user.is_admin && <td className="right"><button type="button" className="btn sm" onClick={() => setEdit({ ...t })}>Edit</button></td>}
+            </tr>
+          ))}
+        </tbody>
+      </table></div>
+      {edit && (
+        <Modal title={`Email template: ${edit.label}`} onClose={() => setEdit(null)} wide
+          footer={<>
+            <button type="button" className="btn primary" disabled={busy || !edit.subject || !edit.body} onClick={() => save(false)}>Save</button>
+            {edit.customised && <button type="button" className="btn" disabled={busy} onClick={() => save(true)}>Reset to default</button>}
+            <button type="button" className="btn" onClick={() => setEdit(null)}>Cancel</button>
+          </>}>
+          <div className="stack">
+            <Field label="Subject" required><Input value={edit.subject} onChange={(v) => setEdit({ ...edit, subject: v })} /></Field>
+            <Field label="Message" required><Textarea rows={9} value={edit.body} onChange={(v) => setEdit({ ...edit, body: v })} /></Field>
+            <div className="small muted">Placeholders: {data.placeholders.map((p) => <span key={p} className="mono" style={{ marginRight: 8 }}>{`{{${p}}}`}</span>)}</div>
+          </div>
+        </Modal>
+      )}
+    </>
+  );
+}
+
+// ------------------------------------------------------------------ data backup
+export function DataBackupSettings() {
+  const { user } = useAuth();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const download = async () => {
+    setBusy(true);
+    try {
+      const data = await api.get('/settings/backup');
+      const mod: any = await import('exceljs');
+      const ExcelJS = mod.default ?? mod;
+      const wb = new ExcelJS.Workbook();
+      wb.creator = 'Rokesh Inventory';
+      for (const sh of data.sheets) {
+        const ws = wb.addWorksheet(sh.name.slice(0, 31), { views: [{ state: 'frozen', ySplit: 1 }] });
+        const keys = sh.rows.length ? Object.keys(sh.rows[0]) : ['(empty)'];
+        ws.columns = keys.map((k) => ({ header: k.replace(/_/g, ' '), key: k, width: Math.min(40, Math.max(12, k.length + 4)) }));
+        for (const row of sh.rows) ws.addRow(row);
+        ws.getRow(1).font = { bold: true };
+      }
+      const buf = await wb.xlsx.writeBuffer();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+      a.download = `backup-${data.generated_at.slice(0, 10)}.xlsx`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      toast(`Backup downloaded: ${data.sheets.length} sheets, ${data.sheets.reduce((s, x) => s + x.rows.length, 0)} rows`);
+    } catch (e) { toast(e.message, 'error'); } finally { setBusy(false); }
+  };
+  return (
+    <>
+      <PageHead title="Data Backup" />
+      <div className="card"><div className="card-body stack">
+        <p style={{ margin: 0 }}>Download a copy of your organization’s data as one Excel workbook — items and stock, customers, vendors, every sales and purchase document with its lines, payments, adjustments, transfers and the full stock movement history, one sheet each.</p>
+        <p className="muted small" style={{ margin: 0 }}>Keep it somewhere safe, or open it in Excel to analyse your data. Attached files (images, PDFs) are not included. Downloading is recorded in the audit log.</p>
+        {user.is_admin
+          ? <div><button type="button" className="btn primary" disabled={busy} onClick={download}>{busy ? 'Preparing…' : 'Download backup (.xlsx)'}</button></div>
+          : <div className="info-box">Only administrators can download a full backup.</div>}
+      </div></div>
+    </>
+  );
+}

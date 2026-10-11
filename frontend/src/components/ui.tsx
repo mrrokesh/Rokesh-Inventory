@@ -157,7 +157,7 @@ export function confirmDialog(opts: any) {
   return new Promise((resolve) => { if (confirmSetter) confirmSetter({ ...opts, resolve }); else resolve(window.confirm(opts.message)); });
 }
 
-export function Dropdown({ button, children, left }: any) {
+export function Dropdown({ button, children, left, menuClass }: any) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   useEffect(() => {
@@ -169,7 +169,7 @@ export function Dropdown({ button, children, left }: any) {
   return (
     <div className="menu-wrap" ref={ref}>
       {button(() => setOpen((o) => !o), open)}
-      {open && <div className={`menu ${left ? 'left' : ''}`} onClick={() => setOpen(false)}>{children}</div>}
+      {open && <div className={`menu ${left ? 'left' : ''} ${menuClass || ''}`} onClick={() => setOpen(false)}>{children}</div>}
     </div>
   );
 }

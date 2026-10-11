@@ -15,6 +15,8 @@ Once set up, every invoice, estimate, sales order, purchase order, credit note a
 
 **Sending a document:** open it and press **Email**. The customer's email, a subject and a friendly message are filled in — edit if you like and press **Send**. The items, totals and tax are added below your message automatically, plus a *Pay online* or *View in portal* button when available. Every email is listed in **Settings → Email → Recently sent**.
 
+**Your own wording:** go to **Settings → Email templates** to set the subject and message used for each kind of document. Press **Edit**, change the text and **Save**. Placeholders in double braces are replaced with the document’s details when you press **Email**: `{{contact_name}}`, `{{number}}`, `{{total}}`, `{{balance}}`, `{{due_date}}`, `{{date}}`, `{{reference}}`, `{{org_name}}`, `{{document}}`. **Reset to default** brings back the built-in wording. Only administrators can change templates.
+
 ## Razorpay (customers pay invoices online)
 
 Customers pay by UPI, card or net banking. The payment is recorded and the invoice marked **Paid** automatically — no typing.

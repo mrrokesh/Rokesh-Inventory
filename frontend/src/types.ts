@@ -14,6 +14,7 @@ export type SessionUser = {
   org_state?: string;
   gst_enabled?: boolean;
   plan_modules?: Record<string, boolean>;
+  org_features?: Record<string, boolean>;
   plan_name?: string;
   org_status?: string;
   subscription_status?: string;
@@ -35,6 +36,7 @@ export type DocCfg = {
   title: string;
   one: string;
   perm: string;
+  feature?: string;
   entity: string;
   contactType: 'customer' | 'vendor';
   priceKind: 'sales' | 'purchase';

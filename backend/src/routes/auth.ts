@@ -8,6 +8,7 @@ import { setupOrganization } from '../lib/orgSetup.js';
 import { audit } from '../lib/audit.js';
 import { config } from '../config.js';
 import { orgAccessMessage } from '../lib/plans.js';
+import { mergeFeatures } from '../lib/orgFeatures.js';
 
 const r = Router();
 
@@ -36,7 +37,7 @@ async function sessionPayload(userId, extra: Record<string, unknown> = {}) {
   const { rows } = await query(
     `SELECT u.id, u.name, u.email, u.org_id, r.id AS role_id, r.name AS role_name, r.is_admin, r.permissions,
             o.name AS org_name, o.currency, o.logo_path, o.gst_registered, o.date_format, o.state AS org_state, o.portal_slug,
-            o.status AS org_status, o.trial_ends_at, o.plan_id, o.subscription_status, o.paid_until,
+            o.status AS org_status, o.trial_ends_at, o.plan_id, o.subscription_status, o.paid_until, o.features AS org_features,
             p.code AS plan_code, p.name AS plan_name, p.max_users, p.max_warehouses, p.max_items, p.modules AS plan_modules,
             p.price_monthly AS plan_price_monthly,
             (o.smtp IS NOT NULL) AS email_configured,
@@ -47,7 +48,8 @@ async function sessionPayload(userId, extra: Record<string, unknown> = {}) {
     [userId],
   );
   if (!rows[0]) return null;
-  return { ...rows[0], ...extra };
+  const row = rows[0];
+  return { ...row, org_features: mergeFeatures(row.org_features), ...extra };
 }
 
 r.get('/signup-status', (_req, res) => {

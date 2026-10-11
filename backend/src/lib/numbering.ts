@@ -8,6 +8,7 @@ export const DEFAULT_SERIES = [
   ['package', 'PKG-', 5],
   ['shipment', 'SHP-', 5],
   ['invoice', 'INV-', 6],
+  ['retainer_invoice', 'RI-', 5],
   ['payment_received', 'PR-', 5],
   ['sales_return', 'RMA-', 5],
   ['credit_note', 'CN-', 5],

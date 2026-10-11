@@ -4,6 +4,7 @@ import { badRequest } from './errors.js';
 
 export const TAG_MODULES: Record<string, string> = {
   estimate: 'Estimates', sales_order: 'Sales orders', delivery_challan: 'Delivery challans', invoice: 'Invoices',
+  retainer: 'Retainer invoices',
   credit_note: 'Credit notes', purchase_order: 'Purchase orders', bill: 'Bills', vendor_credit: 'Vendor credits',
 };
 

@@ -72,8 +72,11 @@ const Portal = lazy(() => import('./pages/portal/Portal'));
 const Platform = lazy(() => import('./pages/platform/Platform'));
 const PublicSite = lazy(() => import('./pages/PublicSite'));
 
-function Guard({ perm, action = 'view', children }: { perm?: string; action?: string; children: ReactNode }) {
-  const { can } = useAuth();
+function Guard({ perm, action = 'view', feature, children }: { perm?: string; action?: string; feature?: string; children: ReactNode }) {
+  const { can, hasFeature } = useAuth();
+  if (feature && !hasFeature(feature)) {
+    return <div className="page"><EmptyState title="Feature turned off" text="This module is hidden. Turn it on in Settings → Features." /></div>;
+  }
   if (perm && !can(perm, action)) {
     return <div className="page"><EmptyState title="No access" text="Your role does not have permission to open this page. Ask an administrator." /></div>;
   }
@@ -132,10 +135,10 @@ export default function App() {
   }
 
   const docRoutes = Object.values(DOCS as unknown as Record<string, DocCfg>).flatMap((cfg) => [
-    <Route key={`${cfg.key}-l`} path={cfg.path} element={<Guard perm={cfg.perm}><DocList cfg={cfg} /></Guard>} />,
-    <Route key={`${cfg.key}-n`} path={`${cfg.path}/new`} element={<Guard perm={cfg.perm} action="create"><DocForm key={`${cfg.key}-new${location.search}`} cfg={cfg} /></Guard>} />,
-    <Route key={`${cfg.key}-d`} path={`${cfg.path}/:id`} element={<Guard perm={cfg.perm}><DocDetail key={cfg.key} cfg={cfg} /></Guard>} />,
-    <Route key={`${cfg.key}-e`} path={`${cfg.path}/:id/edit`} element={<Guard perm={cfg.perm} action="edit"><DocForm key={`${cfg.key}-edit`} cfg={cfg} /></Guard>} />,
+    <Route key={`${cfg.key}-l`} path={cfg.path} element={<Guard perm={cfg.perm} feature={cfg.feature}><DocList cfg={cfg} /></Guard>} />,
+    <Route key={`${cfg.key}-n`} path={`${cfg.path}/new`} element={<Guard perm={cfg.perm} action="create" feature={cfg.feature}><DocForm key={`${cfg.key}-new${location.search}`} cfg={cfg} /></Guard>} />,
+    <Route key={`${cfg.key}-d`} path={`${cfg.path}/:id`} element={<Guard perm={cfg.perm} feature={cfg.feature}><DocDetail key={cfg.key} cfg={cfg} /></Guard>} />,
+    <Route key={`${cfg.key}-e`} path={`${cfg.path}/:id/edit`} element={<Guard perm={cfg.perm} action="edit" feature={cfg.feature}><DocForm key={`${cfg.key}-edit`} cfg={cfg} /></Guard>} />,
   ]);
 
   return (
@@ -156,7 +159,7 @@ export default function App() {
           <Route path="/item-groups/new" element={<Guard perm="items" action="create"><ItemGroupForm /></Guard>} />
           <Route path="/item-groups/:id" element={<Guard perm="items"><ItemGroupDetail /></Guard>} />
           <Route path="/item-groups/:id/edit" element={<Guard perm="items" action="edit"><ItemGroupForm /></Guard>} />
-          <Route path="/price-lists" element={<Guard perm="items"><PriceLists /></Guard>} />
+          <Route path="/price-lists" element={<Guard perm="items" feature="price_lists"><PriceLists /></Guard>} />
 
           <Route path="/inventory/adjustments" element={<Guard perm="inventory"><AdjustmentsList /></Guard>} />
           <Route path="/inventory/adjustments/new" element={<Guard perm="inventory" action="create"><AdjustmentForm /></Guard>} />
@@ -169,12 +172,12 @@ export default function App() {
           <Route path="/inventory/assemblies" element={<Guard perm="inventory"><AssembliesList /></Guard>} />
           <Route path="/inventory/assemblies/new" element={<Guard perm="inventory" action="create"><AssemblyForm /></Guard>} />
           <Route path="/inventory/assemblies/:id" element={<Guard perm="inventory"><AssemblyDetail /></Guard>} />
-          <Route path="/inventory/stock-counts" element={<Guard perm="inventory"><StockCountsList /></Guard>} />
-          <Route path="/inventory/stock-counts/new" element={<Guard perm="inventory" action="create"><StockCountForm /></Guard>} />
-          <Route path="/inventory/stock-counts/:id" element={<Guard perm="inventory"><StockCountDetail /></Guard>} />
-          <Route path="/inventory/picklists" element={<Guard perm="packages"><PicklistsList /></Guard>} />
-          <Route path="/inventory/picklists/new" element={<Guard perm="packages" action="create"><PicklistForm /></Guard>} />
-          <Route path="/inventory/picklists/:id" element={<Guard perm="packages"><PicklistDetail /></Guard>} />
+          <Route path="/inventory/stock-counts" element={<Guard perm="inventory" feature="stock_counts"><StockCountsList /></Guard>} />
+          <Route path="/inventory/stock-counts/new" element={<Guard perm="inventory" action="create" feature="stock_counts"><StockCountForm /></Guard>} />
+          <Route path="/inventory/stock-counts/:id" element={<Guard perm="inventory" feature="stock_counts"><StockCountDetail /></Guard>} />
+          <Route path="/inventory/picklists" element={<Guard perm="packages" feature="picklists"><PicklistsList /></Guard>} />
+          <Route path="/inventory/picklists/new" element={<Guard perm="packages" action="create" feature="picklists"><PicklistForm /></Guard>} />
+          <Route path="/inventory/picklists/:id" element={<Guard perm="packages" feature="picklists"><PicklistDetail /></Guard>} />
 
           <Route path="/tasks" element={<TasksList />} />
           <Route path="/tasks/:id" element={<TaskDetail />} />
@@ -222,6 +225,7 @@ export default function App() {
           <Route path="/reports/:key" element={<Guard perm="reports"><ReportView /></Guard>} />
           <Route path="/documents" element={<Guard perm="documents"><Documents /></Guard>} />
           <Route path="/import/:type" element={<Import />} />
+          <Route path="/configure-features" element={<Navigate to="/settings/features" replace />} />
           <Route path="/settings/*" element={<Guard perm="settings"><Settings /></Guard>} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/help" element={<Help />} />

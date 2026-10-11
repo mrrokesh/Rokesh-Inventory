@@ -2,11 +2,12 @@
 import { tx } from '../db.js';
 import { can } from '../middleware/auth.js';
 import { audit } from '../lib/audit.js';
-import { conflict } from '../lib/errors.js';
-import { str, date, obj, oneOf, today } from '../lib/validate.js';
+import { badRequest, conflict, notFound } from '../lib/errors.js';
+import { str, num, int, date, obj, oneOf, today, addDays, round2 } from '../lib/validate.js';
 import { takeNumber } from '../lib/numbering.js';
 import { stockOut, reverseSource, ctxOf } from '../lib/stock.js';
-import { fetchDoc } from '../lib/documents.js';
+import { fetchDoc, refreshPayable } from '../lib/documents.js';
+import { PAYMENT_MODES } from './payments.js';
 import { trackingFor } from '../lib/tracking.js';
 import { createDocRouter } from './docRouter.js';
 
@@ -143,4 +144,129 @@ deliveryChallans.post('/:id/return', can('delivery_challans', 'approve'), async 
     return fetchDoc(client, DC_CFG, req.orgId, dc.id);
   });
   res.json(doc);
+});
+
+// ================================================================== retainer invoices
+const RI_CFG = { table: 'retainers', linesTable: 'retainer_lines', label: 'Retainer Invoice' };
+
+async function refreshRetainer(client, retainerId) {
+  const { rows: [r] } = await client.query('SELECT total, amount_paid, status FROM retainers WHERE id = $1', [retainerId]);
+  if (!r || r.status === 'draft' || r.status === 'void') return;
+  const { rows: [a] } = await client.query('SELECT COALESCE(SUM(amount),0) AS s FROM retainer_applications WHERE retainer_id = $1', [retainerId]);
+  const applied = Number(a.s);
+  const paid = Number(r.amount_paid);
+  const unused = round2(Math.max(0, paid - applied));
+  const balance = round2(Math.max(0, Number(r.total) - paid));
+  let status = 'sent';
+  if (paid >= Number(r.total) - 0.004 && unused <= 0.004) status = 'closed';
+  else if (paid >= Number(r.total) - 0.004) status = 'paid';
+  else if (paid > 0) status = 'partially_paid';
+  await client.query(
+    `UPDATE retainers SET amount_applied = $2, unused = $3, balance = $4, status = $5, updated_at = now() WHERE id = $1`,
+    [retainerId, applied, unused, balance, status],
+  );
+}
+
+export const retainers = createDocRouter({
+  ...RI_CFG, entity: 'retainer', module: 'retainers', numberType: 'retainer_invoice', contactType: 'customer',
+  hasBalance: true,
+  listExtraSelect: `CASE WHEN d.status IN ('sent','partially_paid') AND d.due_date < CURRENT_DATE THEN 'overdue' ELSE d.status END AS display_status`,
+  header: (b, contact) => {
+    const docDate = date(b.doc_date, { field: 'Date' }) || today();
+    const terms = int(b.payment_terms, { field: 'Payment terms', min: 0, max: 365, def: contact.payment_terms });
+    return {
+      payment_terms: terms,
+      due_date: date(b.due_date, { field: 'Due date' }) || addDays(docDate, terms),
+      salesperson: str(b.salesperson, { field: 'Salesperson', max: 100 }),
+      ...addressHeader(b, contact),
+    };
+  },
+  enrich: async (db, req, doc) => {
+    const [{ rows: payments }, { rows: applications }] = await Promise.all([
+      db.query('SELECT id, amount, payment_date, mode, reference FROM retainer_payments WHERE retainer_id = $1 ORDER BY payment_date, id', [doc.id]),
+      db.query(
+        `SELECT a.id, a.amount, a.applied_date, a.invoice_id, i.number AS invoice_number
+           FROM retainer_applications a JOIN invoices i ON i.id = a.invoice_id WHERE a.retainer_id = $1 ORDER BY a.id`,
+        [doc.id],
+      ),
+    ]);
+    doc.retainer_payments = payments;
+    doc.applications = applications;
+    doc.display_status = ['sent', 'partially_paid'].includes(doc.status) && doc.due_date < today() ? 'overdue' : doc.status;
+  },
+});
+
+retainers.post('/:id/send', can('retainers', 'approve'), async (req, res) => {
+  const doc = await tx(async (client) => {
+    const ri = await fetchDoc(client, RI_CFG, req.orgId, Number(req.params.id), { lock: true });
+    if (ri.status !== 'draft') throw conflict('Only draft retainer invoices can be marked as sent');
+    await client.query("UPDATE retainers SET status = 'sent', balance = total, unused = 0, updated_at = now() WHERE id = $1", [ri.id]);
+    await audit(client, req, 'approve', 'retainer', ri.id, `Retainer invoice ${ri.number} marked as sent`);
+    return fetchDoc(client, RI_CFG, req.orgId, ri.id);
+  });
+  res.json(doc);
+});
+
+retainers.post('/:id/record-payment', can('retainers', 'edit'), async (req, res) => {
+  const b = req.body || {};
+  const doc = await tx(async (client) => {
+    const ri = await fetchDoc(client, RI_CFG, req.orgId, Number(req.params.id), { lock: true });
+    if (!['sent', 'partially_paid'].includes(ri.status)) throw conflict('This retainer invoice is not open for payment');
+    const amount = round2(num(b.amount, { field: 'Amount', required: true, min: 0.01 }));
+    if (amount > Number(ri.balance) + 0.004) throw badRequest('Amount exceeds the balance due');
+    await client.query(
+      `INSERT INTO retainer_payments (retainer_id, amount, payment_date, mode, reference) VALUES ($1,$2,$3,$4,$5)`,
+      [ri.id, amount, date(b.payment_date, { field: 'Date' }) || today(), oneOf(b.mode, PAYMENT_MODES, { field: 'Mode', def: 'bank_transfer' }), str(b.reference, { field: 'Reference', max: 100 })],
+    );
+    await client.query('UPDATE retainers SET amount_paid = amount_paid + $2 WHERE id = $1', [ri.id, amount]);
+    await refreshRetainer(client, ri.id);
+    await audit(client, req, 'update', 'retainer', ri.id, `Payment of ${amount} recorded on retainer ${ri.number}`);
+    return fetchDoc(client, RI_CFG, req.orgId, ri.id);
+  });
+  res.json(doc);
+});
+
+retainers.post('/:id/apply', can('retainers', 'edit'), async (req, res) => {
+  const doc = await tx(async (client) => {
+    const ri = await fetchDoc(client, RI_CFG, req.orgId, Number(req.params.id), { lock: true });
+    if (!['paid', 'partially_paid', 'sent', 'closed'].includes(ri.status)) throw conflict('Collect payment on this retainer before applying it');
+    const allocations = Array.isArray(req.body?.allocations) ? req.body.allocations : [];
+    let total = 0;
+    for (const a of allocations) {
+      const amount = round2(num(a.amount, { field: 'Amount', min: 0, def: 0 }));
+      if (!amount) continue;
+      const { rows: [inv] } = await client.query('SELECT * FROM invoices WHERE org_id = $1 AND id = $2 FOR UPDATE', [req.orgId, Number(a.invoice_id)]);
+      if (!inv || inv.contact_id !== ri.contact_id) throw badRequest('Invoice not found for this customer');
+      if (!['sent', 'partially_paid'].includes(inv.status)) throw badRequest(`Invoice ${inv.number} is not open`);
+      if (amount > inv.balance + 0.004) throw badRequest(`Amount exceeds the balance of invoice ${inv.number}`);
+      await client.query(
+        'INSERT INTO retainer_applications (retainer_id, invoice_id, amount, applied_date) VALUES ($1,$2,$3,$4)',
+        [ri.id, inv.id, amount, today()],
+      );
+      await refreshPayable(client, 'invoice', inv.id);
+      total += amount;
+    }
+    if (!total) throw badRequest('Enter an amount to apply');
+    const unused = Number(ri.unused || 0);
+    if (total > unused + 0.004) throw badRequest('Total exceeds unused retainer amount');
+    await refreshRetainer(client, ri.id);
+    await audit(client, req, 'update', 'retainer', ri.id, `Retainer ${ri.number}: ${total} applied to invoices`);
+    return fetchDoc(client, RI_CFG, req.orgId, ri.id);
+  });
+  res.json(doc);
+});
+
+retainers.delete('/:id/applications/:appId', can('retainers', 'edit'), async (req, res) => {
+  await tx(async (client) => {
+    const ri = await fetchDoc(client, RI_CFG, req.orgId, Number(req.params.id), { lock: true });
+    const { rows: [app] } = await client.query(
+      'DELETE FROM retainer_applications WHERE id = $1 AND retainer_id = $2 RETURNING invoice_id',
+      [Number(req.params.appId), ri.id],
+    );
+    if (!app) throw notFound('Application');
+    await refreshPayable(client, 'invoice', app.invoice_id);
+    await refreshRetainer(client, ri.id);
+    await audit(client, req, 'update', 'retainer', ri.id, `Retainer application removed from ${ri.number}`);
+  });
+  res.status(204).end();
 });

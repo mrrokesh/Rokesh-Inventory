@@ -8,9 +8,10 @@ import DataTable from '../components/DataTable';
 import { Badge, Checkbox, EmptyState, ErrorBox, Field, FormRow, Input, Modal, PageHead, Select, Spinner, Textarea, confirmDialog, useAction, useApi } from '../components/ui';
 import { useToast } from '../components/Toast';
 import { Developer, EmailSettings, Integrations } from './SettingsExtra';
-import { BrandingSettings, CurrenciesSettings, CustomFieldsSettings, ReportingTagsSettings, TemplatesSettings } from './SettingsCustom';
+import { BrandingSettings, CurrenciesSettings, CustomFieldsSettings, DataBackupSettings, EmailTemplatesSettings, ReportingTagsSettings, TemplatesSettings } from './SettingsCustom';
 import WorkflowSettings from './Workflows';
 import { CustomModulesSettings, WebFormsSettings, WebTabsSettings } from './SettingsModules';
+import ConfigureFeatures from './ConfigureFeatures';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -232,7 +233,7 @@ function Warehouses() {
       <PageHead title="Warehouses">{editable && <button type="button" className="btn primary" onClick={() => setEditing({ name: '', code: '', address: { country: 'India' }, status: 'active' })}>+ New warehouse</button>}</PageHead>
       <p className="muted" style={{ marginTop: 0 }}>Stock is tracked separately for each warehouse. Use transfer orders to move stock between them.</p>
       <ErrorBox error={error} />
-      <div className="card"><table className="table">
+      <div className="card table-wrap"><table className="table">
         <thead><tr><th>Name</th><th>Address</th><th>Contact</th><th className="num">Items in stock</th><th className="num">Stock value</th><th>Status</th>{editable && <th />}</tr></thead>
         <tbody>
           {!data && <tr><td colSpan={7}><Spinner /></td></tr>}
@@ -276,7 +277,7 @@ function Warehouses() {
 // ------------------------------------------------------------------ numbering
 const DOC_NAMES = {
   estimate: 'Estimate', sales_order: 'Sales Order', delivery_challan: 'Delivery Challan', package: 'Package', shipment: 'Shipment',
-  invoice: 'Invoice', payment_received: 'Payment Received', sales_return: 'Sales Return', credit_note: 'Credit Note',
+  invoice: 'Invoice', retainer_invoice: 'Retainer Invoice', payment_received: 'Payment Received', sales_return: 'Sales Return', credit_note: 'Credit Note',
   purchase_order: 'Purchase Order', purchase_receive: 'Purchase Receive', bill: 'Bill', payment_made: 'Payment Made', vendor_credit: 'Vendor Credit',
   inventory_adjustment: 'Inventory Adjustment', stock_count: 'Stock Count', transfer_order: 'Transfer Order', assembly: 'Assembly', picklist: 'Picklist',
 };
@@ -452,9 +453,9 @@ function AuditLog() {
 
 // ------------------------------------------------------------------ shell
 const LINKS = [
-  ['organization', 'Organization profile'], ['branding', 'Branding'], ['billing', 'Billing'], ['warehouses', 'Warehouses'], ['taxes', 'Taxes'], ['currencies', 'Currencies'], ['units', 'Units'], ['numbering', 'Number series'], ['custom-fields', 'Custom fields'], ['reporting-tags', 'Reporting tags'], ['templates', 'PDF templates'], ['workflows', 'Workflow rules'], ['custom-modules', 'Custom modules'], ['web-forms', 'Web forms'], ['web-tabs', 'Web tabs'],
+  ['organization', 'Organization profile'], ['features', 'Features'], ['branding', 'Branding'], ['billing', 'Billing'], ['warehouses', 'Warehouses'], ['taxes', 'Taxes'], ['currencies', 'Currencies'], ['units', 'Units'], ['numbering', 'Number series'], ['custom-fields', 'Custom fields'], ['reporting-tags', 'Reporting tags'], ['templates', 'PDF templates'], ['email-templates', 'Email templates'], ['workflows', 'Workflow rules'], ['custom-modules', 'Custom modules'], ['web-forms', 'Web forms'], ['web-tabs', 'Web tabs'],
   ['carriers', 'Shipping carriers'], ['email', 'Email'], ['announcements', 'Announcements'], ['integrations', 'Integrations'],
-  ['developer', 'API keys & webhooks', 'users'], ['users', 'Users', 'users'], ['roles', 'Roles & permissions', 'users'], ['audit', 'Audit log', 'reports'],
+  ['developer', 'API keys & webhooks', 'users'], ['users', 'Users', 'users'], ['roles', 'Roles & permissions', 'users'], ['audit', 'Audit log', 'reports'], ['backup', 'Data backup'],
 ];
 
 function Billing() {
@@ -535,7 +536,7 @@ function AnnouncementsAdmin() {
       <PageHead title="Announcements">
         {editable && <button type="button" className="btn primary" onClick={() => setShow(true)}>+ New announcement</button>}
       </PageHead>
-      <p className="muted" style={{ marginTop: 0 }}>Post notices for your team. They appear under the megaphone icon in the top bar (like Zoho’s announcements).</p>
+      <p className="muted" style={{ marginTop: 0 }}>Post notices for your team. They appear under the orange megaphone in the top bar.</p>
       {show && (
         <div className="card mb"><div className="card-body stack">
           <Field label="Title" required><Input value={f.title} onChange={(v) => setF({ ...f, title: v })} autoFocus /></Field>
@@ -592,11 +593,14 @@ export default function Settings() {
           <Routes>
             <Route index element={<Navigate to="organization" replace />} />
             <Route path="organization" element={<Organization />} />
+            <Route path="features" element={<ConfigureFeatures />} />
             <Route path="billing" element={<Billing />} />
             <Route path="branding" element={<BrandingSettings />} />
             <Route path="custom-fields" element={<CustomFieldsSettings />} />
             <Route path="reporting-tags" element={<ReportingTagsSettings />} />
             <Route path="templates" element={<TemplatesSettings />} />
+            <Route path="email-templates" element={<EmailTemplatesSettings />} />
+            <Route path="backup" element={<DataBackupSettings />} />
             <Route path="workflows" element={<WorkflowSettings />} />
             <Route path="custom-modules" element={<CustomModulesSettings />} />
             <Route path="web-forms" element={<WebFormsSettings />} />

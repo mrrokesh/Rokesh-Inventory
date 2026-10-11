@@ -8,14 +8,14 @@ import { Badge, Dropdown, ErrorBox, PageHead, Spinner, confirmDialog, useAction,
 import { Attachments, History } from '../../components/Attachments';
 import { useToast } from '../../components/Toast';
 import Icon from '../../components/Icon';
-import { ApplyCreditModal, PackageModal, ReceiveModal, RefundModal, ReturnModal } from './Modals';
+import { ApplyCreditModal, PackageModal, ReceiveModal, RecordPaymentModal, RefundModal, ReturnModal } from './Modals';
 import { CHALLAN_TYPES } from './config';
 import { Comments, EmailModal } from '../../components/Comms';
 import SmsModal from '../../components/SmsModal';
 import { CustomFieldValues } from '../../components/CustomFields';
 import { TagValues } from '../../components/ReportingTags';
 
-const EMAILABLE = ['estimates', 'sales_orders', 'invoices', 'credit_notes', 'delivery_challans', 'purchase_orders', 'vendor_credits'];
+const EMAILABLE = ['estimates', 'sales_orders', 'invoices', 'retainers', 'credit_notes', 'delivery_challans', 'purchase_orders', 'vendor_credits'];
 
 export const TEMPLATE_DEFAULTS = {
   layout: 'standard', accent_color: '', title: '', show_logo: true, show_org_address: true, show_sku: true, show_hsn: true, show_discount: true,
@@ -113,7 +113,7 @@ export function DocPaper({ cfg, doc, org, template = null, preview = false }: an
           {doc.currency && doc.currency !== baseCurrency() && <><dt>Currency</dt><dd>{doc.currency} <span className="small faint">(1 {doc.currency} = {Number(doc.exchange_rate)} {baseCurrency()})</span></dd></>}
         </dl>
       </div>
-      <table className="table mt" style={{ marginTop: 24 }}>
+      <div className="table-wrap" style={{ marginTop: 24 }}><table className="table">
         <thead><tr><th>#</th><th>Item & description</th>{showHsn && <th>HSN/SAC</th>}
           {cfg.key === 'sales_orders' && <><th className="num">Packed</th><th className="num">Shipped</th><th className="num">Invoiced</th></>}
           {cfg.key === 'purchase_orders' && <><th className="num">Received</th><th className="num">Billed</th></>}
@@ -137,7 +137,7 @@ export function DocPaper({ cfg, doc, org, template = null, preview = false }: an
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
       <div className="row mt" style={{ alignItems: 'flex-start' }}>
         <div style={{ flex: 1 }}>
           {doc.notes && <><div className="small muted">Notes</div><div style={{ whiteSpace: 'pre-wrap' }} className="mb">{doc.notes}</div></>}
@@ -154,7 +154,9 @@ export function DocPaper({ cfg, doc, org, template = null, preview = false }: an
           {doc.currency && doc.currency !== baseCurrency() && <div className="t-row small faint"><span>Total in {baseCurrency()}</span><span>{money(Number(doc.total) * Number(doc.exchange_rate))}</span></div>}
           {cfg.hasBalance && doc.amount_paid > 0 && <div className="t-row"><span>Payments made</span><span>(-) {dm(doc.amount_paid)}</span></div>}
           {cfg.hasBalance && doc.credits_applied > 0 && <div className="t-row"><span>Credits applied</span><span>(-) {dm(doc.credits_applied)}</span></div>}
+          {cfg.key === 'retainers' && Number(doc.amount_applied) > 0 && <div className="t-row"><span>Applied to invoices</span><span>(-) {dm(doc.amount_applied)}</span></div>}
           {cfg.hasBalance && doc.status !== 'draft' && <div className="t-row bold"><span>Balance due</span><span>{dm(doc.balance)}</span></div>}
+          {cfg.key === 'retainers' && doc.status !== 'draft' && <div className="t-row"><span>Unused retainer</span><span>{dm(doc.unused)}</span></div>}
         </div>
       </div>
       {t.show_signature && (
@@ -261,6 +263,11 @@ export default function DocDetail({ cfg }: any) {
       if (['sent', 'partially_paid', 'paid'].includes(s) && can('sales_returns', 'create')) more.push(<Link key="cn" to={`/credit-notes/new?from_invoice=${doc.id}`}>Create credit note</Link>);
       if (['sent', 'partially_paid', 'paid'].includes(s) && P('approve')) more.push(<button key="v" type="button" className="danger" onClick={() => act('void', 'Invoice voided', { message: `Void invoice ${doc.number}?${doc.sales_order_id ? '' : ' Stock removed by this invoice will be returned.'}`, danger: true, confirmText: 'Void' })}>Void</button>);
       break;
+    case 'retainers':
+      if (isDraft && P('approve')) actions.push(<button key="s" type="button" className="btn primary" disabled={busy} onClick={() => act('send', 'Retainer invoice marked as sent')}>Mark as sent</button>);
+      if (['sent', 'partially_paid'].includes(s) && P('edit')) actions.push(<button key="pay" type="button" className="btn primary" onClick={() => setModal('recordPay')}>Record payment</button>);
+      if (['sent', 'partially_paid', 'paid'].includes(s) && Number(doc.unused) > 0 && P('edit')) actions.push(<button key="a" type="button" className="btn" onClick={() => setModal('apply')}>Apply to invoices</button>);
+      break;
     case 'credit_notes':
       if (isDraft && P('edit')) actions.push(<button key="o" type="button" className="btn primary" disabled={busy} onClick={() => act('open', 'Credit note opened')}>Convert to open</button>);
       if (s === 'open' && P('edit')) {
@@ -333,6 +340,9 @@ export default function DocDetail({ cfg }: any) {
             { render: (r) => <Link to={`/purchase-receives/${r.id}`}>{r.number}</Link> }, { render: (r) => date(r.receive_date) }]} />
           <Related title="Bills" rows={doc.bills} cols={[
             { render: (r) => <Link to={`/bills/${r.id}`}>{r.number}</Link> }, { render: (r) => <Badge status={r.status} /> }, { num: true, render: (r) => money(r.total) }]} />
+          <Related title="Payments collected" rows={doc.retainer_payments} cols={[
+            { render: (r) => `${date(r.payment_date)} · ${modeLabel(r.mode)}` },
+            { render: (r) => r.reference || '' }, { num: true, render: (r) => money(r.amount) }]} />
           <Related title="Payments" rows={doc.payments} cols={[
             { render: (r) => <Link to={`/payments-${cfg.key === 'bills' ? 'made' : 'received'}/${r.payment_id}`}>{r.number}</Link> },
             { render: (r) => `${date(r.payment_date)} · ${modeLabel(r.mode)}` }, { num: true, render: (r) => money(r.amount) }]} />
@@ -354,7 +364,8 @@ export default function DocDetail({ cfg }: any) {
       {modal === 'package' && <PackageModal so={doc} onClose={() => setModal(null)} onDone={(p) => { setModal(null); navigate(`/packages/${p.id}`); }} />}
       {modal === 'return' && <ReturnModal so={doc} onClose={() => setModal(null)} onDone={(r) => { setModal(null); navigate(`/sales-returns/${r.id}`); }} />}
       {modal === 'receive' && <ReceiveModal po={doc} onClose={() => setModal(null)} onDone={() => { setModal(null); refresh(); }} />}
-      {modal === 'apply' && <ApplyCreditModal credit={doc} kind={cfg.key === 'credit_notes' ? 'credit_note' : 'vendor_credit'} onClose={() => setModal(null)} onDone={() => { setModal(null); refresh(); }} />}
+      {modal === 'apply' && <ApplyCreditModal credit={{ ...doc, balance: cfg.key === 'retainers' ? doc.unused : doc.balance }} kind={cfg.key === 'credit_notes' ? 'credit_note' : cfg.key === 'retainers' ? 'retainer' : 'vendor_credit'} onClose={() => setModal(null)} onDone={() => { setModal(null); refresh(); }} />}
+      {modal === 'recordPay' && <RecordPaymentModal doc={doc} onClose={() => setModal(null)} onDone={() => { setModal(null); refresh(); }} />}
       {modal === 'refund' && <RefundModal cn={doc} onClose={() => setModal(null)} onDone={() => { setModal(null); refresh(); }} />}
       {modal === 'email' && <EmailModal entityType={cfg.entity} entityId={doc.id} onClose={() => setModal(null)} onSent={refresh} />}
       {modal === 'sms' && <SmsModal entityType={cfg.entity} entityId={doc.id} contactApi={cfg.contactType === 'customer' ? '/customers' : '/vendors'} contactId={doc.contact_id}

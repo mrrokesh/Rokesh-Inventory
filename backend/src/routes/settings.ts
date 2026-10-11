@@ -16,6 +16,8 @@ import { emailLink } from './email.js';
 import { appUrl } from '../lib/mailer.js';
 import { assertWithinLimit, orgPlan, usageCounts } from '../lib/plans.js';
 import { createSaasPaymentLink, platformBillingConfigured } from '../lib/saasBilling.js';
+import { ORG_FEATURES, mergeFeatures } from '../lib/orgFeatures.js';
+import { notifyOrg } from '../lib/notify.js';
 
 const r = Router();
 
@@ -128,6 +130,33 @@ r.delete('/organization/logo', can('settings', 'edit'), async (req, res) => {
   await query('UPDATE organizations SET logo_path = NULL WHERE id = $1', [req.orgId]);
   removePublic(old?.logo_path);
   res.status(204).end();
+});
+
+r.get('/features', async (req, res) => {
+  const { rows: [org] } = await query('SELECT features FROM organizations WHERE id = $1', [req.orgId]);
+  const enabled = mergeFeatures(org?.features);
+  res.json({ catalog: ORG_FEATURES, features: enabled });
+});
+
+r.put('/features', can('settings', 'edit'), async (req, res) => {
+  const incoming = req.body?.features && typeof req.body.features === 'object' ? req.body.features : {};
+  const next = mergeFeatures(incoming);
+  const { rows: [org] } = await query('SELECT features FROM organizations WHERE id = $1', [req.orgId]);
+  const prev = mergeFeatures(org?.features);
+  await query('UPDATE organizations SET features = $2 WHERE id = $1', [req.orgId, JSON.stringify(next)]);
+  for (const f of ORG_FEATURES) {
+    if (prev[f.key] === false && next[f.key] === true) {
+      await notifyOrg({ query }, req.orgId, {
+        kind: 'event',
+        title: `${f.name} has been enabled for your organization.`,
+        link: '/settings/features',
+        entityType: 'organization',
+        entityId: req.orgId,
+      });
+    }
+  }
+  await audit({ query }, req, 'update', 'organization', req.orgId, 'Configure Features updated');
+  res.json({ catalog: ORG_FEATURES, features: next });
 });
 
 // ------------------------------------------------------------ simple lookup tables
@@ -629,6 +658,40 @@ r.delete('/reporting-tags/:id', can('settings', 'edit'), async (req, res) => {
   if (!row) throw notFound('Reporting tag');
   await audit({ query }, req, 'delete', 'reporting_tag', Number(req.params.id), `Reporting tag “${row.name}” deleted`);
   res.status(204).end();
+});
+
+// ------------------------------------------------------------ data backup (Settings → Data backup)
+const BACKUP_SHEETS: [string, string][] = [
+  ['Items', `SELECT i.name, i.sku, i.barcode, i.item_type, i.category, i.brand, i.unit, i.hsn_sac, i.selling_price, i.cost_price, i.reorder_level, i.status,
+                    COALESCE((SELECT SUM(on_hand) FROM stock_levels s WHERE s.item_id = i.id), 0) AS stock_on_hand, i.custom_fields, i.created_at
+               FROM items i WHERE i.org_id = $1 ORDER BY i.name`],
+  ['Stock by warehouse', `SELECT i.name AS item, i.sku, w.name AS warehouse, s.on_hand, s.committed FROM stock_levels s JOIN items i ON i.id = s.item_id JOIN warehouses w ON w.id = s.warehouse_id WHERE s.org_id = $1 ORDER BY i.name, w.name`],
+  ['Customers', `SELECT display_name, company_name, email, phone, mobile, gst_treatment, gstin, pan, place_of_supply, currency, payment_terms, credit_limit, status, billing_address, notes, custom_fields FROM contacts WHERE org_id = $1 AND contact_type = 'customer' ORDER BY display_name`],
+  ['Vendors', `SELECT display_name, company_name, email, phone, mobile, gst_treatment, gstin, pan, place_of_supply, currency, payment_terms, msme_registered, udyam_number, status, billing_address, notes, custom_fields FROM contacts WHERE org_id = $1 AND contact_type = 'vendor' ORDER BY display_name`],
+  ['Warehouses', `SELECT name, status, address FROM warehouses WHERE org_id = $1 ORDER BY name`],
+  ...['estimates', 'sales_orders', 'invoices', 'retainers', 'credit_notes', 'delivery_challans', 'purchase_orders', 'bills', 'vendor_credits'].map((t): [string, string] => [
+    t.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+    `SELECT d.number, d.doc_date, c.display_name AS contact, d.status, d.reference, d.currency, d.exchange_rate, d.sub_total, d.discount_total, d.tax_total, d.total,
+            ${['invoices', 'bills', 'retainers', 'credit_notes', 'vendor_credits'].includes(t) ? 'd.balance,' : ''} d.notes, d.custom_fields, d.created_at
+       FROM ${t} d JOIN contacts c ON c.id = d.contact_id WHERE d.org_id = $1 ORDER BY d.doc_date, d.number`,
+  ]),
+  ['Invoice lines', `SELECT d.number AS invoice, COALESCE(i.name, l.description) AS item, i.sku, l.quantity, l.rate, l.discount_percent, l.tax_rate, l.amount FROM invoice_lines l JOIN invoices d ON d.id = l.doc_id LEFT JOIN items i ON i.id = l.item_id WHERE d.org_id = $1 ORDER BY d.number, l.position`],
+  ['Bill lines', `SELECT d.number AS bill, COALESCE(i.name, l.description) AS item, i.sku, l.account, l.quantity, l.rate, l.discount_percent, l.tax_rate, l.amount FROM bill_lines l JOIN bills d ON d.id = l.doc_id LEFT JOIN items i ON i.id = l.item_id WHERE d.org_id = $1 ORDER BY d.number, l.position`],
+  ['Payments received', `SELECT p.number, p.payment_date, c.display_name AS customer, p.mode, p.reference, p.currency, p.amount, p.unused_amount FROM payments_received p JOIN contacts c ON c.id = p.contact_id WHERE p.org_id = $1 ORDER BY p.payment_date`],
+  ['Payments made', `SELECT p.number, p.payment_date, c.display_name AS vendor, p.mode, p.reference, p.currency, p.amount, p.unused_amount FROM payments_made p JOIN contacts c ON c.id = p.contact_id WHERE p.org_id = $1 ORDER BY p.payment_date`],
+  ['Stock movements', `SELECT m.movement_date, i.name AS item, i.sku, w.name AS warehouse, m.source_type, m.source_number, m.quantity, m.value, m.note FROM stock_movements m JOIN items i ON i.id = m.item_id JOIN warehouses w ON w.id = m.warehouse_id WHERE m.org_id = $1 ORDER BY m.movement_date, m.id`],
+  ['Adjustments', `SELECT a.number, a.adj_date, a.reason, a.mode, a.status, w.name AS warehouse FROM inventory_adjustments a JOIN warehouses w ON w.id = a.warehouse_id WHERE a.org_id = $1 ORDER BY a.adj_date`],
+  ['Transfer orders', `SELECT t.number, t.transfer_date, fw.name AS from_warehouse, tw.name AS to_warehouse, t.status FROM transfer_orders t JOIN warehouses fw ON fw.id = t.from_warehouse_id JOIN warehouses tw ON tw.id = t.to_warehouse_id WHERE t.org_id = $1 ORDER BY t.transfer_date`],
+];
+
+r.get('/backup', requireAdmin, async (req, res) => {
+  const sheets = [];
+  for (const [name, sql] of BACKUP_SHEETS) {
+    const { rows } = await query(`${sql} LIMIT 100000`, [req.orgId]);
+    sheets.push({ name, rows: rows.map((row) => Object.fromEntries(Object.entries(row).map(([k, v]) => [k, v !== null && typeof v === 'object' && !(v instanceof Date) ? JSON.stringify(v) : v]))) });
+  }
+  await audit({ query }, req, 'export', 'organization', req.orgId, 'Full data backup downloaded');
+  res.json({ generated_at: new Date().toISOString(), sheets });
 });
 
 export default r;

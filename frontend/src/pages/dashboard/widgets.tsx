@@ -122,10 +122,30 @@ export const WIDGETS: any[] = [
     },
   },
   {
+    id: 'pending_actions', title: 'Pending actions', icon: 'alert', color: 'orange', sizes: ['large', 'medium'], defaultSize: 'large',
+    description: 'Everything waiting on you — pick, pack, ship, receive, transfer, and stock counts.',
+    render: ({ data, size }) => {
+      const all = [
+        [data.pending.to_be_picked, 'To be picked', '/inventory/picklists'],
+        [data.pending.to_be_packed, 'To be packed', '/sales-orders?status=confirmed'],
+        [data.pending.to_be_shipped, 'To be shipped', '/packages?status=not_shipped'],
+        [data.pending.to_be_delivered, 'To be delivered', '/shipments?status=shipped'],
+        [data.pending.to_be_invoiced, 'To be invoiced', '/sales-orders?status=confirmed'],
+        [data.pending.to_be_received, 'To be received', '/purchase-orders?status=issued'],
+        [data.pending.receive_in_progress, 'Receive in progress', '/purchase-orders?status=issued'],
+        [data.products.low_stock, 'Below reorder level', '/items?stock=low'],
+        [data.pending.transfer_in_progress, 'Transfer in progress', '/inventory/transfers?status=in_transit'],
+        [data.pending.pending_stock_counts, 'Pending stock counts', '/inventory/stock-counts'],
+      ];
+      return <StatTiles items={size === 'medium' ? all.slice(0, 6) : all} />;
+    },
+  },
+  {
     id: 'sales_activity', title: 'Sales activity', icon: 'sales', color: 'blue', perm: 'sales_orders', sizes: ['medium'], defaultSize: 'medium',
-    description: 'Track orders waiting to be packed, shipped, delivered or invoiced.',
+    description: 'Track orders waiting to be picked, packed, shipped, delivered or invoiced.',
     render: ({ data }) => (
       <StatTiles items={[
+        [data.pending.to_be_picked, 'To be picked', '/inventory/picklists'],
         [data.pending.to_be_packed, 'To be packed', '/sales-orders?status=confirmed'],
         [data.pending.to_be_shipped, 'To be shipped', '/packages?status=not_shipped'],
         [data.pending.to_be_delivered, 'To be delivered', '/shipments?status=shipped'],
@@ -135,13 +155,15 @@ export const WIDGETS: any[] = [
   },
   {
     id: 'purchase_activity', title: 'Purchase activity', icon: 'purchases', color: 'purple', perm: 'purchase_orders', sizes: ['medium'], defaultSize: 'medium',
-    description: 'Track purchase orders waiting to be received or billed.',
+    description: 'Track purchase orders waiting to be received or billed, plus warehouse ops.',
     render: ({ data }) => (
       <StatTiles items={[
         [data.pending.to_be_received, 'To be received', '/purchase-orders?status=issued'],
-        [data.pending.receive_in_progress, 'Partly received', '/purchase-orders?status=issued'],
+        [data.pending.receive_in_progress, 'Receive in progress', '/purchase-orders?status=issued'],
         [data.pending.to_be_billed, 'To be billed', '/purchase-orders?status=issued'],
-        [data.products.low_stock, 'Below reorder', '/items?stock=low'],
+        [data.products.low_stock, 'Below reorder level', '/items?stock=low'],
+        [data.pending.transfer_in_progress, 'Transfer in progress', '/inventory/transfers?status=in_transit'],
+        [data.pending.pending_stock_counts, 'Pending stock counts', '/inventory/stock-counts'],
       ]} />
     ),
   },
@@ -358,6 +380,7 @@ export const WIDGET_MAP = Object.fromEntries(WIDGETS.map((w) => [w.id, w]));
 
 export const DEFAULT_LAYOUT = [
   { id: 'getting_started', size: 'large' },
+  { id: 'pending_actions', size: 'large' },
   { id: 'today', size: 'medium' },
   { id: 'low_stock', size: 'medium' },
   { id: 'sales_activity', size: 'medium' },

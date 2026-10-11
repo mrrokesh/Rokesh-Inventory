@@ -14,7 +14,7 @@ export const DOCS = {
     postLabel: 'Save and Mark as Sent', postAction: 'send',
   },
   delivery_challans: {
-    key: 'delivery_challans', api: '/delivery-challans', path: '/delivery-challans', title: 'Delivery Challans', one: 'Delivery Challan', perm: 'delivery_challans',
+    key: 'delivery_challans', api: '/delivery-challans', path: '/delivery-challans', title: 'Delivery Challans', one: 'Delivery Challan', perm: 'delivery_challans', feature: 'delivery_challans',
     entity: 'delivery_challan', contactType: 'customer', priceKind: 'sales', numberLabel: 'Delivery Challan#', dateLabel: 'Challan Date',
     printTitle: 'Delivery Challan', warehouseLabel: 'Dispatch from warehouse', addresses: true,
     header: [{ key: 'challan_type', label: 'Challan Type', type: 'select', options: CHALLAN_TYPES }],
@@ -44,6 +44,18 @@ export const DOCS = {
       { key: 'salesperson', label: 'Salesperson', type: 'text' },
     ],
     statuses: [['', 'All'], ['draft', 'Draft'], ['sent', 'Sent'], ['unpaid', 'Unpaid'], ['overdue', 'Overdue'], ['partially_paid', 'Partially paid'], ['paid', 'Paid'], ['void', 'Void']],
+    postLabel: 'Save and Mark as Sent', postAction: 'send',
+  },
+  retainers: {
+    key: 'retainers', api: '/retainers', path: '/retainers', title: 'Retainer Invoices', one: 'Retainer Invoice', perm: 'retainers',
+    entity: 'retainer', contactType: 'customer', priceKind: 'sales', numberLabel: 'Retainer Invoice#', dateLabel: 'Date',
+    printTitle: 'Retainer Invoice', warehouseLabel: 'Warehouse', addresses: true, hasBalance: true, feature: 'retainer_invoices',
+    header: [
+      { key: 'payment_terms', label: 'Terms', type: 'terms' },
+      { key: 'due_date', label: 'Due Date', type: 'date' },
+      { key: 'salesperson', label: 'Salesperson', type: 'text' },
+    ],
+    statuses: [['', 'All'], ['draft', 'Draft'], ['sent', 'Sent'], ['unpaid', 'Unpaid'], ['overdue', 'Overdue'], ['partially_paid', 'Partially paid'], ['paid', 'Paid'], ['closed', 'Closed'], ['void', 'Void']],
     postLabel: 'Save and Mark as Sent', postAction: 'send',
   },
   credit_notes: {

@@ -42,6 +42,12 @@ r.get('/', async (req, res) => {
   ] = await Promise.all([
     q(`SELECT
         (SELECT COUNT(DISTINCT d.id) FROM sales_orders d JOIN sales_order_lines l ON l.doc_id = d.id JOIN items i ON i.id = l.item_id
+          WHERE d.org_id = $1 AND d.status = 'confirmed' AND i.item_type = 'goods'
+            AND (l.quantity - COALESCE(l.qty_packed, 0)) >
+                COALESCE((SELECT SUM(pl.quantity_to_pick) FROM picklist_lines pl
+                            JOIN picklists p ON p.id = pl.picklist_id
+                           WHERE p.status = 'draft' AND pl.sales_order_line_id = l.id), 0))::int AS to_be_picked,
+        (SELECT COUNT(DISTINCT d.id) FROM sales_orders d JOIN sales_order_lines l ON l.doc_id = d.id JOIN items i ON i.id = l.item_id
           WHERE d.org_id = $1 AND d.status = 'confirmed' AND i.item_type = 'goods' AND l.qty_packed < l.quantity)::int AS to_be_packed,
         (SELECT COUNT(*) FROM packages WHERE org_id = $1 AND status = 'not_shipped')::int AS to_be_shipped,
         (SELECT COUNT(*) FROM shipments WHERE org_id = $1 AND status IN ('shipped','in_transit'))::int AS to_be_delivered,
@@ -54,7 +60,9 @@ r.get('/', async (req, res) => {
           WHERE d.org_id = $1 AND d.status = 'issued' AND l.qty_received < l.quantity
             AND EXISTS (SELECT 1 FROM purchase_receives pr WHERE pr.purchase_order_id = d.id))::int AS receive_in_progress,
         (SELECT COUNT(DISTINCT d.id) FROM purchase_orders d JOIN purchase_order_lines l ON l.doc_id = d.id
-          WHERE d.org_id = $1 AND d.status = 'issued' AND l.qty_billed < l.quantity)::int AS to_be_billed`),
+          WHERE d.org_id = $1 AND d.status = 'issued' AND l.qty_billed < l.quantity)::int AS to_be_billed,
+        (SELECT COUNT(*) FROM transfer_orders WHERE org_id = $1 AND status = 'in_transit')::int AS transfer_in_progress,
+        (SELECT COUNT(*) FROM stock_counts WHERE org_id = $1 AND status IN ('draft','in_progress'))::int AS pending_stock_counts`),
     q(`SELECT COALESCE(SUM(on_hand),0) AS quantity_in_hand,
               (SELECT COALESCE(SUM(l.quantity - l.qty_received),0) FROM purchase_order_lines l JOIN purchase_orders d ON d.id = l.doc_id
                 JOIN items i ON i.id = l.item_id WHERE d.org_id = $1 AND d.status = 'issued' AND i.item_type = 'goods') AS quantity_to_receive,

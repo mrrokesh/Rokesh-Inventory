@@ -10,6 +10,7 @@ type AuthContextValue = {
   refresh: () => Promise<SessionUser>;
   can: (module: string, action?: PermissionAction | string) => boolean;
   hasModule: (key: string) => boolean;
+  hasFeature: (key: string) => boolean;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -45,9 +46,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return m[key] !== false;
   }, [user]);
 
+  const hasFeature = useCallback((key: string) => {
+    if (!user) return false;
+    const f = user.org_features;
+    if (!f || typeof f !== 'object') return true;
+    return f[key] !== false;
+  }, [user]);
+
   const value = useMemo(
-    () => ({ user, loading, startSession, logout, refresh, can, hasModule }),
-    [user, loading, startSession, logout, refresh, can, hasModule],
+    () => ({ user, loading, startSession, logout, refresh, can, hasModule, hasFeature }),
+    [user, loading, startSession, logout, refresh, can, hasModule, hasFeature],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

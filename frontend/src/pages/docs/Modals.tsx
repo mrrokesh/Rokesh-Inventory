@@ -168,14 +168,14 @@ export function ApplyCreditModal({ credit, kind, onClose, onDone }: any) {
   const [busy, run] = useAction(toast);
   const [docs, setDocs] = useState(null);
   const [values, setValues] = useState<any>({});
-  const docApi = kind === 'credit_note' ? '/invoices' : '/bills';
+  const docApi = kind === 'vendor_credit' ? '/bills' : '/invoices';
   useEffect(() => {
     api.get(docApi, { contact_id: credit.contact_id, status: 'unpaid', per_page: 100, sort: 'date', dir: 'asc' }).then((r) => setDocs(r.data)).catch(() => setDocs([]));
   }, [docApi, credit.contact_id]);
   const total = (Object.values(values) as any[]).reduce((s, v) => s + Number(v || 0), 0);
   const save = async () => {
-    const key = kind === 'credit_note' ? 'invoice_id' : 'bill_id';
-    const api2 = kind === 'credit_note' ? `/credit-notes/${credit.id}/apply` : `/vendor-credits/${credit.id}/apply`;
+    const key = kind === 'vendor_credit' ? 'bill_id' : 'invoice_id';
+    const api2 = kind === 'credit_note' ? `/credit-notes/${credit.id}/apply` : kind === 'retainer' ? `/retainers/${credit.id}/apply` : `/vendor-credits/${credit.id}/apply`;
     const r = await run(() => api.post(api2, { allocations: Object.entries(values).filter(([, v]) => Number(v) > 0).map(([id, amount]) => ({ [key]: Number(id), amount })) }), 'Credits applied');
     if (r) onDone(r);
   };
@@ -184,7 +184,7 @@ export function ApplyCreditModal({ credit, kind, onClose, onDone }: any) {
       footer={<><span className="muted" style={{ marginRight: 'auto' }}>Applying {money(total)} of {money(credit.balance)} available</span>
         <button type="button" className="btn" onClick={onClose}>Cancel</button>
         <button type="button" className="btn primary" disabled={busy || total <= 0 || total > Number(credit.balance) + 0.004} onClick={save}>Apply</button></>}>
-      {docs === null ? 'Loading…' : docs.length === 0 ? <div className="faint">There are no unpaid {kind === 'credit_note' ? 'invoices' : 'bills'} for {credit.contact_name}.</div> : (
+      {docs === null ? 'Loading…' : docs.length === 0 ? <div className="faint">There are no unpaid {kind === 'vendor_credit' ? 'bills' : 'invoices'} for {credit.contact_name}.</div> : (
         <table className="table compact">
           <thead><tr><th>Date</th><th>Number</th><th className="num">Amount</th><th className="num">Balance</th><th className="num" style={{ width: 150 }}>Amount to apply</th></tr></thead>
           <tbody>{docs.map((d) => (
@@ -193,6 +193,27 @@ export function ApplyCreditModal({ credit, kind, onClose, onDone }: any) {
           ))}</tbody>
         </table>
       )}
+    </Modal>
+  );
+}
+
+export function RecordPaymentModal({ doc, onClose, onDone }: any) {
+  const toast = useToast();
+  const [busy, run] = useAction(toast);
+  const [f, setF] = useState({ payment_date: today(), amount: doc.balance, mode: 'bank_transfer', reference: '' });
+  const save = async () => {
+    const r = await run(() => api.post(`/retainers/${doc.id}/record-payment`, f), 'Payment recorded');
+    if (r) onDone(r);
+  };
+  return (
+    <Modal title={`Record payment for ${doc.number}`} onClose={onClose}
+      footer={<><button type="button" className="btn" onClick={onClose}>Cancel</button><button type="button" className="btn primary" disabled={busy} onClick={save}>Record payment</button></>}>
+      <div className="grid-2">
+        <Field label="Date"><Input type="date" value={f.payment_date} onChange={(v) => setF({ ...f, payment_date: v })} /></Field>
+        <Field label="Amount" hint={`Balance due: ${money(doc.balance)}`}><Input type="number" min="0.01" max={doc.balance} step="0.01" value={f.amount} onChange={(v) => setF({ ...f, amount: v })} /></Field>
+        <Field label="Paid via"><Select value={f.mode} onChange={(v) => setF({ ...f, mode: v })} options={PAYMENT_MODES} /></Field>
+        <Field label="Reference#"><Input value={f.reference} onChange={(v) => setF({ ...f, reference: v })} /></Field>
+      </div>
     </Modal>
   );
 }

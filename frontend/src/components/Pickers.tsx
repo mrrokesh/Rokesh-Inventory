@@ -26,7 +26,10 @@ export function Combobox({ value, valueLabel, onSelect, fetcher, renderOption, g
       if (!r) return;
       const below = window.innerHeight - r.bottom;
       const up = below < 300 && r.top > below;
-      setPos({ left: r.left, width: Math.max(r.width, 300), ...(up ? { top: 'auto', bottom: window.innerHeight - r.top + 2 } : { top: r.bottom + 2, bottom: 'auto' }) });
+      // At least 300px wide, but never past the screen edge on small phones.
+      const width = Math.min(Math.max(r.width, 300), window.innerWidth - 16);
+      const left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8));
+      setPos({ left, width, minWidth: 0, ...(up ? { top: 'auto', bottom: window.innerHeight - r.top + 2 } : { top: r.bottom + 2, bottom: 'auto' }) });
     };
     place();
     window.addEventListener('resize', place);

@@ -9,6 +9,7 @@ export const MODULES = {
   delivery_challans: ['view', 'create', 'edit', 'delete', 'approve'],
   packages: ['view', 'create', 'edit', 'delete'],                     // packages + shipments
   invoices: ['view', 'create', 'edit', 'delete', 'approve'],
+  retainers: ['view', 'create', 'edit', 'delete', 'approve'],
   payments_received: ['view', 'create', 'edit', 'delete'],
   sales_returns: ['view', 'create', 'edit', 'delete'],                // returns + credit notes
   purchase_orders: ['view', 'create', 'edit', 'delete', 'approve'],
@@ -44,7 +45,7 @@ export const DEFAULT_ROLES = [
     description: 'Customers, sales orders, packages, invoices and payments received.',
     is_admin: false,
     permissions: {
-      ...crud(['customers', 'estimates', 'sales_orders', 'delivery_challans', 'packages', 'invoices', 'payments_received', 'sales_returns']),
+      ...crud(['customers', 'estimates', 'sales_orders', 'delivery_challans', 'packages', 'invoices', 'retainers', 'payments_received', 'sales_returns']),
       ...viewOnly(['items']), documents: ['view', 'create'], reports: ['view'], custom_modules: ['view', 'create', 'edit'],
     },
   },
@@ -72,7 +73,7 @@ export const DEFAULT_ROLES = [
     description: 'Invoices, bills, payments, credits and all reports.',
     is_admin: false,
     permissions: {
-      ...all(['invoices', 'payments_received', 'bills', 'payments_made', 'vendor_credits', 'reports']),
+      ...all(['invoices', 'retainers', 'payments_received', 'bills', 'payments_made', 'vendor_credits', 'reports']),
       sales_returns: ['view', 'create', 'edit'],
       ...viewOnly(['items', 'customers', 'vendors', 'estimates', 'sales_orders', 'delivery_challans', 'purchase_orders', 'inventory', 'settings']),
       documents: ['view', 'create'], custom_modules: ['view', 'create', 'edit'],
