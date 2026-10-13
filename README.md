@@ -123,6 +123,27 @@ Client admins see **Settings → Billing** (plan, paid-until, pay/renew via plat
 
 Each organization still gets: primary warehouse, default roles (Admin, Manager, Sales User, Purchase User, Warehouse User, Accountant), units and document numbering (SO-00001, PO-00001, INV-000001 …).
 
+### Production (Rokesh Cloud, single service)
+
+[Rokesh Cloud](https://host.rokeshcloud.com) runs the whole app as **one web service** from the root `Dockerfile`:
+it builds the frontend and the Node API serves both the website and `/api` from the same address, so no
+`VITE_API_URL` or cross-site CORS setup is needed.
+
+1. In Rokesh Cloud, connect GitHub and give the **rokeshcloud-host** app access to `mrrokesh/Rokesh-Inventory`.
+2. In the **Inventory** project, add a web service from the repo: root `/`, build pack **Dockerfile**, port **4000**.
+3. Add a PostgreSQL database in the same project and link it, or set `DATABASE_URL` to an existing database.
+   Tables are created automatically on first start (migrations run on startup).
+4. Environment variables on the service:
+   - `DATABASE_URL` (set by linking the database)
+   - `JWT_SECRET`, a long random string
+   - `NODE_ENV=production`, `PORT=4000`
+   - `APP_URL` and `CORS_ORIGIN`, both set to the service URL (`https://<id>.host.rokeshcloud.com`)
+   - `SIGNUP_MODE`, `PLATFORM_ADMIN_EMAIL` / `PLATFORM_ADMIN_PASSWORD`, `SUPPORT_EMAIL` and the optional
+     `PLATFORM_RAZORPAY_*` keys, as in the Render list below
+5. Deploy. On the Free plan auto-deploy is off, so press **Deploy** (or ask Claude to deploy) after each push.
+
+Uploaded files (logos, attachments) are stored on the container disk and are lost when it is rebuilt.
+
 ### Production (Vercel + Render)
 
 Frontend goes to [Vercel](https://vercel.com), API to [Render](https://render.com). Use the same PostgreSQL `DATABASE_URL` as local (do not create a new hosted database unless you want one).
